@@ -1,8 +1,16 @@
 # Handoff — Followers Marble Race
-_Last updated: 2026-07-06 · Current stage: Stage 2 — Rendering Pipeline (functionally complete)_
+_Last updated: 2026-07-06 · Current stage: Stage 3 — Real Data Sources (first adapter built)_
 
 ## 🎯 Goals
-Stage 1 (core race engine) and Stage 2 (Remotion rendering pipeline) are both built and verified. A real 30-racer manifest now renders end-to-end into a shareable vertical MP4 with track/marbles/camera-follow, a full results screen, and a background-music track. Next goal is Stage 3 — replace placeholder avatars with real Instagram follower data via the two pluggable `FollowerSource` adapters.
+Stages 1 (engine) and 2 (renderer) are built and verified — a real 30-racer manifest renders end-to-end into a shareable vertical MP4. Stage 3 (real Instagram data) is now underway: the first adapter — `PostCommentersSource` (races a post's commenters via `instaloader`) — is built and unit-tested. Next: a live run once the user supplies burner-account creds, then the official-export and instagrapi follower adapters.
+
+## 🆕 Most recent work (Stage 3 — commenters adapter)
+At the user's request, added a `FollowerSource` that races the **commenters of one post** (not followers), using `instaloader`. Ran a feasibility research workflow first (12 agents, verified against the real instaloader docs — all core mechanics confirmed; login mandatory; 429 rate-limiting certain; account-ban risk real-but-undocumented). Then built:
+- `engine/sources/post_commenters.py` — `PostCommentersSource` + `extract_shortcode()` + `PostUnavailableError`. Constructor takes a post URL (mirrors `LocalFolderSource`'s "source carries its target" pattern — zero interface change). `instaloader` imported lazily so the module + test suite work without it installed.
+- Per the user's two adjustments: **no cap** by default (include all ~90 commenters), and an **`extra_entries`** option to add bonus marbles for a specific commenter (same face/name, unique marble ids like `ig-<userid>-x2`).
+- `engine/tests/test_post_commenters.py` — 24 tests, 97% module coverage, fake `instaloader` injected via `sys.modules` so nothing hits the live API.
+- Docs: `staging/stage-3-data-sources/feature-commenters-adapter.md`, updated stage-3 `overview.md`, `help.md` (burner creds + `.env` vars + `pip install instaloader`).
+- **Blocked on the user for a live run**: `pip install instaloader` + burner Instagram creds in `.env` (`IG_USERNAME`/`IG_PASSWORD`/optional `IG_2FA_CODE`). Also still no CLI that goes URL → simulate → render in one shot (natural next step once creds exist).
 
 ## 📍 Current State
 **Python engine** (`engine/`, own venv):
@@ -36,10 +44,11 @@ Stage 1 (core race engine) and Stage 2 (Remotion rendering pipeline) are both bu
 - Stage 2: `zod` installed at its latest (4.4.3) initially — Remotion 4.0.485 requires exactly 4.3.6 and warns loudly about version mismatches. Pinned to the exact required version.
 
 ## ➡️ Next Up
-1. Start Stage 3 (Real Data Sources) — see `staging/stage-3-data-sources/overview.md`. Needs the human to request a Meta data export and decide on an instagrapi account (both flagged in `help.md`).
-2. Still needed from the user: a real royalty-free background music track (current one is a silent placeholder) — swap-in point is `renderer/src/audio.ts`'s `backgroundMusic` subscriber, no restructuring needed.
-3. When Stage 4 (Elimination) starts: budget real design time for `physics.py`'s loop restructuring and the finish-handling body-lifecycle change — see `feature-race-engine.md`'s corrected "Extension hook points" note.
-4. When real event-timed SFX are added (Stage 4+): `AudioCue` needs a per-cue timing field and `RaceComposition` needs per-cue `<Sequence>` wrapping — see the corrected note in `feature-audio-layer.md`.
+1. **Live-test the commenters adapter** once the user provides burner creds + installs instaloader (see `help.md`). Then build a small CLI/flag that goes post URL → `PostCommentersSource.fetch()` → `run_race()` → render, so a real commenter race can be produced end-to-end.
+2. Build the other two Stage 3 adapters: official Meta export parser + instagrapi follower scraper.
+3. Still needed from the user: a real royalty-free background music track (current one is a silent placeholder) — swap-in point is `renderer/src/audio.ts`'s `backgroundMusic` subscriber, no restructuring needed.
+4. When Stage 4 (Elimination) starts: budget real design time for `physics.py`'s loop restructuring and the finish-handling body-lifecycle change — see `feature-race-engine.md`'s corrected "Extension hook points" note.
+5. When real event-timed SFX are added (Stage 4+): `AudioCue` needs a per-cue timing field and `RaceComposition` needs per-cue `<Sequence>` wrapping — see the corrected note in `feature-audio-layer.md`.
 
 ## 🔗 Pointer
-→ Current stage folder: `staging/stage-2-rendering-pipeline/` (functionally complete) · Next stage folder: `staging/stage-3-data-sources/` · Active feature file once Stage 3 starts: `staging/stage-3-data-sources/feature-official-export-adapter.md`
+→ Current stage folder: `staging/stage-3-data-sources/` · Active feature file: `staging/stage-3-data-sources/feature-commenters-adapter.md` (built; live run pending user creds) · Stages 1 & 2 complete and verified.

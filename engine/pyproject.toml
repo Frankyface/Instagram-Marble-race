@@ -5,6 +5,7 @@ requires-python = ">=3.9"
 dependencies = [
     "pymunk>=6.6",
     "Pillow>=10.0",
+    "instaloader>=4.13",
 ]
 
 [project.optional-dependencies]

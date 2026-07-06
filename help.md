@@ -10,8 +10,18 @@ _Things only I (the human) can do. Check off as completed._
 - [ ] **Pick/source a real royalty-free looping background music track** for the video's audio bed — e.g. YouTube Audio Library, Pixabay Music, or a licensed source. Confirm it's safe to use on a video posted to Instagram. A silent placeholder (`renderer/public/audio/background.wav`, generated locally) stands in for now; once you have a real track, replace that file (keep the `.wav` extension, or update the `src` field in `renderer/src/audio.ts`'s `backgroundMusic` subscriber if using a different format like `.mp3`) — no other code changes needed.
 
 ## Blocks Stage 3 (Real Data Sources)
-- [ ] **Official export path**: Go to Instagram → Settings → "Download Your Information," request a JSON export of your account data (includes your followers list). This can take a few hours to a day for Instagram to generate — request it early since Stage 3 needs a real export to build the parser against.
-- [ ] **instagrapi path**: Decide which Instagram account you're willing to use for the unofficial scraper (understand the ban/flag risk before committing — consider a secondary/burner account rather than your primary one). Have its login credentials ready — they'll go in a local `.env` file (already covered by `.gitignore`), never committed to the repo.
+- [ ] **Commenters path (instaloader — BUILT, needs creds to run live)**: The `PostCommentersSource` adapter is built and unit-tested. To actually run it against a real post, you need to:
+  1. `cd engine && .venv/Scripts/python.exe -m pip install instaloader` (declared in `pyproject.toml`; not yet installed — I can run this for you when you're ready).
+  2. Decide which Instagram account logs in — **strongly recommend a secondary/burner account**, not your primary, because of the (real but undocumented) account-ban risk of unofficial scraping. Comment retrieval and HD avatars both require login.
+  3. Put its creds in a local `.env` (already gitignored, never committed):
+     ```
+     IG_USERNAME=your_burner_handle
+     IG_PASSWORD=your_burner_password
+     # IG_2FA_CODE=123456   # only if the account has 2FA, and only for the first login
+     ```
+     After the first successful login, instaloader saves a session file and reuses it — you won't need the password on later runs.
+- [ ] **Official export path**: Go to Instagram → Settings → "Download Your Information," request a JSON export of your account data (includes your followers list). This can take a few hours to a day for Instagram to generate — request it early since the official-export adapter needs a real export to build against.
+- [ ] **instagrapi path**: Decide which Instagram account you're willing to use for the unofficial *follower* scraper (same ban/flag considerations as the burner above). Creds go in the same local `.env`.
 
 ## Blocks GitHub setup
 - [x] Repo created manually at [github.com/Frankyface/Instagram-Marble-race](https://github.com/Frankyface/Instagram-Marble-race) (`gh` CLI isn't installed locally, so this was done via the GitHub web UI instead of `gh repo create`).
