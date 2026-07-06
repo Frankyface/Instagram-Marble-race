@@ -13,7 +13,7 @@ Elimination and brackets are both defined as configuration on top of this primit
 - Race ends when either all marbles finish, or a defined timeout/stall condition is hit (marbles stuck forever shouldn't hang the sim).
 
 ## Implementation (Stage 1 checkpoint)
-Built in `engine/`: `raceengine.race.run_race(race_id, racers, config) -> RaceManifest` is the pure-function entrypoint (`raceengine/race.py`). Track is a vertical channel of static pymunk walls + staggered peg obstacles (`raceengine/track.py`), physics stepping + finish detection lives in `raceengine/physics.py`, event/results assembly in `raceengine/events.py`, JSON export in `raceengine/manifest.py`. 25 tests passing, 97% coverage. Verified end-to-end via `scripts/run_sample_race.py` against 40 generated placeholder avatars (`fixtures/`).
+Built in `engine/`: `raceengine.race.run_race(race_id, racers, config) -> RaceManifest` is the pure-function entrypoint (`raceengine/race.py`). Track is a vertical channel of static pymunk walls + staggered peg obstacles (`raceengine/track.py`), physics stepping + finish detection lives in `raceengine/physics.py`, event/results assembly in `raceengine/events.py`, JSON export in `raceengine/manifest.py`. 27 tests passing, 98% coverage. Verified end-to-end via `scripts/run_sample_race.py` against 40 generated placeholder avatars (`fixtures/`).
 
 ## Open Questions — resolved
 - **Camera-follow / progress metric**: simple vertical Y position. The track is a straight vertical channel (y increases downward, matching typical video/canvas coordinate conventions), so "furthest along" = largest y. Chosen over arc-length for simplicity; revisit only if a future track shape becomes non-monotonic (loops, branches).
