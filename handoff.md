@@ -47,12 +47,23 @@ Added a `FollowerSource` that races the **commenters of one post** (not follower
 - Stage 2: assumed `calculateMetadata` could read files via `node:fs` since it "runs in Node" — wrong. Everything in `src/` is webpack-bundled for the browser render context; `node:`-scheme imports aren't handled by webpack's defaults, and even bare `fs`/`path` imports fail to resolve (no Node polyfills configured). Fixed by moving all file I/O into `scripts/render.mjs`, a plain unbundled Node script that passes fully-resolved data into the composition as `inputProps`.
 - Stage 2: `zod` installed at its latest (4.4.3) initially — Remotion 4.0.485 requires exactly 4.3.6 and warns loudly about version mismatches. Pinned to the exact required version.
 
-## ➡️ Next Up
-1. Commenters adapter is done + live-verified. Refresh `IG_SESSIONID` when it expires (see `help.md`).
-2. Build the other two Stage 3 adapters: official Meta export parser + instagrapi *follower* scraper (both can reuse the instagrapi client pattern now proven here).
-3. Still needed from the user: a real royalty-free background music track (current one is a silent placeholder) — swap-in point is `renderer/src/audio.ts`'s `backgroundMusic` subscriber, no restructuring needed.
-4. When Stage 4 (Elimination) starts: budget real design time for `physics.py`'s loop restructuring and the finish-handling body-lifecycle change — see `feature-race-engine.md`'s corrected "Extension hook points" note.
-5. When real event-timed SFX are added (Stage 4+): `AudioCue` needs a per-cue timing field and `RaceComposition` needs per-cue `<Sequence>` wrapping — see the corrected note in `feature-audio-layer.md`.
+## ➡️ Next Up — Stage 6 (Web App + Level Editor) is the current focus
+User decisions (2026-07-06): **browser-first (physics ported to JS/planck.js), one cohesive web app (editor + URL→video flow together), personal use (one IG session, no auth).** Planning done; keystone started. This session is very long — continue Stage 6 in a fresh session using `new_session_prompt.md`. Full plan: `staging/stage-6-web-editor-app/overview.md`.
+
+Build order:
+1. Scaffold `web/` as Vite + React + TS; add `planck` (JS physics) + `@remotion/player`. (`web/` today holds only the keystone: `src/level/types.ts` + `levels/classic-funnel.json` + README.)
+2. W2 JS physics (planck.js): Level + N marbles → frame positions + events, same race-manifest shape the Python engine produces. Re-tune fresh in JS; don't chase pymunk parity.
+3. W3 app shell: load a level → run sim → play via Remotion Player in-browser.
+4. W4 canvas level editor (palette pieces → compiled to walls/pegs).
+5. W5 thin local Python `/commenters` API wrapping `engine/sources/post_commenters.py`.
+6. W6 MP4 export — reuse the Node Remotion renderer (`renderer/`).
+
+Hard constraint: the Instagram fetch (instagrapi) and MP4 encoding stay server-side; everything else client-side.
+
+### Lower priority / carried
+- Refresh `IG_SESSIONID` in `engine/.env` when it expires (`help.md`).
+- Real royalty-free music track (swap `renderer/src/audio.ts`'s `backgroundMusic` src).
+- Stages 4 (elimination) / 5 (brackets) on the Python engine; the other two Stage 3 adapters — none block Stage 6.
 
 ## 🔗 Pointer
-→ Current stage folder: `staging/stage-3-data-sources/` · Active feature file: `staging/stage-3-data-sources/feature-commenters-adapter.md` (built; live run pending user creds) · Stages 1 & 2 complete and verified.
+→ Current stage folder: `staging/stage-6-web-editor-app/` · Active feature file: `staging/stage-6-web-editor-app/feature-level-format.md` (keystone; `web/src/level/types.ts` implements the draft). Stages 1–2 complete/verified; Stage 3 commenters adapter working + live-verified.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "name": "Classic Funnel",
+  "size": { "width": 720, "height": 3200 },
+  "marbleRadius": 32,
+  "spawn": { "x": 60, "y": 0, "width": 600, "height": 200 },
+  "finishY": 3100,
+  "walls": [
+    { "points": [[0, 0], [0, 3200]], "thickness": 20 },
+    { "points": [[720, 0], [720, 3200]], "thickness": 20 },
+    { "points": [[0, 1200], [280, 1400]], "thickness": 18 },
+    { "points": [[720, 1200], [440, 1400]], "thickness": 18 }
+  ],
+  "pegs": [
+    { "x": 180, "y": 500, "radius": 22 },
+    { "x": 360, "y": 500, "radius": 22 },
+    { "x": 540, "y": 500, "radius": 22 },
+    { "x": 270, "y": 700, "radius": 22 },
+    { "x": 450, "y": 700, "radius": 22 },
+    { "x": 180, "y": 2000, "radius": 22 },
+    { "x": 360, "y": 2000, "radius": 22 },
+    { "x": 540, "y": 2000, "radius": 22 },
+    { "x": 270, "y": 2300, "radius": 22 },
+    { "x": 450, "y": 2300, "radius": 22 }
+  ],
+  "gates": []
+}

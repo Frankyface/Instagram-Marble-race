@@ -70,8 +70,9 @@ Both goals must NOT be architecturally foreclosed by v1 decisions — in particu
 | 3 — Real Data Sources | Build both `FollowerSource` adapters (official export + instagrapi) behind the common interface | A race video generates from a real Instagram account's actual followers | Next up |
 | 4 — Elimination Mode | Add gated panel-reset logic on top of the core engine | Elimination races (gate cutoffs, panel resets) work end-to-end | Not started — will need real changes to `physics.py`, see feature-race-engine.md |
 | 5 — Brackets Mode | Add multi-race tournament composition (configurable rounds, top-X advances) on top of the core engine | Full bracket tournaments, feeding into a final race, work end-to-end | Not started — engine already supports this |
+| 6 — Web App + Level Editor | A browser app: design custom track "levels" in a visual editor, race a post's commenters on them, preview live, export MP4. Physics ported to JS (planck.js), personal/local use. | Paste a URL → design/pick a level → watch commenters race → export MP4, all in the browser | **In progress** — architecture decided + level format started; see `staging/stage-6-web-editor-app/` |
 
-(Stages 6+ — web app, scheduled posting — are future-horizon, not yet broken into stage folders; see Future Roadmap above.)
+Note: the commenters race (Stage 3's instagrapi adapter) is already working end-to-end and produced a real video. Stage 6 pulls Stages 1–3 into a browser app with an editor. Scheduled auto-posting to Instagram remains a later future-horizon item.
 
 ## Open Questions & Risks
 - **Renderer complexity** (flagged as biggest risk) — resolved: Stage 2 shipped and a real 30-racer manifest renders correctly (verified via extracted frames). Simple flat 2D visuals held up fine; no further mitigation needed unless real Instagram avatars (Stage 3) reveal new issues.
