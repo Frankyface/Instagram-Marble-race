@@ -11,6 +11,7 @@ Project just scaffolded from the kickoff interview. No code written yet — docs
 None yet — Stage 1 hasn't started.
 
 ## ✅ Things I've Changed
+- 2026-07-06: Git remote `origin` set to https://github.com/Frankyface/Instagram-Marble-race.git (repo created manually via GitHub web UI, no `gh` CLI locally); local branch renamed `master` → `main`. Push is the one manual step left (see `help.md`).
 - 2026-07-06: Project scaffolded (CLAUDE.md, docs/master_plan.md, 5-stage plan under staging/, help.md) from the kickoff interview.
 
 ## ❌ Tried But Failed

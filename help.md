@@ -13,9 +13,15 @@ _Things only I (the human) can do. Check off as completed._
 - [ ] **instagrapi path**: Decide which Instagram account you're willing to use for the unofficial scraper (understand the ban/flag risk before committing — consider a secondary/burner account rather than your primary one). Have its login credentials ready — they'll go in a local `.env` file (already covered by `.gitignore`), never committed to the repo.
 
 ## Blocks GitHub setup
-- [ ] Decide: should the GitHub repo be **public or private**? (Recommend private, since it may end up containing Instagram-account-adjacent config even if credentials themselves stay out of git.)
-- [ ] Confirm the repo name (defaulting to `followers-marble-race` unless you want something else).
-- [ ] If `gh` CLI isn't installed/authenticated when we get there, run `gh auth login` first, or create the repo manually at github.com and share the remote URL.
+- [x] Repo created manually at [github.com/Frankyface/Instagram-Marble-race](https://github.com/Frankyface/Instagram-Marble-race) (`gh` CLI isn't installed locally, so this was done via the GitHub web UI instead of `gh repo create`).
+- [x] Local repo initialized, all scaffold files committed, remote `origin` set to this repo, local branch renamed `master` → `main` to match.
+- [ ] **Push the initial commit** — this is the one step left for you to run manually (kept manual on purpose rather than auto-pushed):
+  ```
+  cd "Followers Marble Race"
+  git push -u origin main
+  ```
+  If GitHub prompts for auth (no `gh` installed to handle it), use a personal access token as the password, or set up the GitHub CLI (`gh auth login`) / Git Credential Manager first.
+- [ ] Optional: install `gh` CLI (`winget install --id GitHub.cli`) so future repo operations (PRs, issues) can be automated instead of manual.
 
 ## Blocks 6-12mo horizon (web app, scheduled posting)
 - [ ] Not needed yet — revisit once v1 (all 3 modes) is working. Will likely need: a hosting account (e.g. Vercel/Fly.io) for the web app, and Instagram Graph API / Meta Developer app approval for scheduled posting (this has its own review process — worth starting early once you're ready to pursue it, since Meta's app review can take time).
