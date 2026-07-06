@@ -35,9 +35,16 @@ def _spawn_marble_bodies(
     per_row = max(1, int(track.width // (radius * 2.5)))
     spawn_margin = radius * 1.5
 
+    # Shuffle who spawns where (seeded, so still deterministic per seed). Otherwise
+    # spawn slots are assigned in list order and the first-listed racer always lands
+    # in the top row closest to the track entrance - a permanent head-start that made
+    # the same marble win every race. Shuffling gives every marble a fair, varied draw.
+    ordered = list(racers)
+    rng.shuffle(ordered)
+
     bodies = {}
     shapes = {}
-    for index, racer in enumerate(racers):
+    for index, racer in enumerate(ordered):
         row = index // per_row
         col = index % per_row
         x = spawn_margin + col * (radius * 2.5) + rng.uniform(-radius * 0.3, radius * 0.3)

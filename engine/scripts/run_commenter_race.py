@@ -19,6 +19,22 @@ from pathlib import Path
 _ENGINE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ENGINE_ROOT))
 
+# Bonus marbles for specific commenters (user-provided). Values are EXTRA marbles
+# beyond each person's base entry, so a total of "N" here means N-1. Each extra is a
+# distinct marble (unique id) sharing the same face/name.
+EXTRA_ENTRIES = {
+    "jamessheil0": 1,             # total 2
+    "_finnhughes": 1,            # total 2
+    "alexbubyn": 1,              # total 2
+    "abygail_wilson": 2,        # total 3
+    "nk_fortyish_and_fitish": 5,  # total 6 (corrected from "nk_fortish_and_fitish")
+    "brandon_sangster": 1,      # total 2
+    "j.bak3s01": 3,             # total 4
+    "emma_beirness": 1,          # total 2
+    "luke_howardd": 2,           # total 3
+    "e.dewar04": 2,              # total 3
+}
+
 
 def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (avoids a python-dotenv dependency). Existing env wins.
@@ -54,6 +70,25 @@ def _racers_from_manifest(path: Path) -> tuple:
     )
 
 
+def _apply_extra_entries(racers: tuple, extra: dict) -> tuple:
+    """Add bonus marbles for the commenters in `extra` (same face/name, unique ids).
+    Re-applying is idempotent: entries already suffixed with -x are skipped as sources."""
+    from raceengine.models import Racer
+
+    extra_lower = {k.lower(): v for k, v in extra.items()}
+    out: list = []
+    for racer in racers:
+        if "-x" in racer.id:  # already an extra; don't multiply extras of extras
+            out.append(racer)
+            continue
+        out.append(racer)
+        for n in range(extra_lower.get(racer.username.lower(), 0)):
+            out.append(
+                Racer(id=f"{racer.id}-x{n + 2}", username=racer.username, avatar_path=racer.avatar_path)
+            )
+    return tuple(out)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", nargs="?", help="Instagram post URL (/p/, /reel/, or /tv/)")
@@ -68,11 +103,11 @@ def main() -> None:
     # Track tuning: big marbles (visible) on a long, busy course. It's long enough
     # to be a real race and given enough time that (nearly) everyone actually crosses
     # the line, so placements are real finish-order rather than depth-ranked stragglers.
-    parser.add_argument("--width", type=float, default=720.0)
+    parser.add_argument("--width", type=float, default=900.0)
     parser.add_argument("--length", type=float, default=4000.0)
     parser.add_argument("--marble-radius", type=float, default=32.0)
-    parser.add_argument("--rows", type=int, default=18, help="peg rows (course complexity)")
-    parser.add_argument("--max-duration", type=float, default=32.0)
+    parser.add_argument("--rows", type=int, default=14, help="peg rows (course complexity)")
+    parser.add_argument("--max-duration", type=float, default=45.0)
     parser.add_argument(
         "--output", type=Path, default=_ENGINE_ROOT / "output" / "commenter_race.json"
     )
@@ -101,6 +136,11 @@ def main() -> None:
         if not racers:
             raise SystemExit("No commenters fetched (empty post, or all avatars failed).")
         print(f"Fetched {len(racers)} racers.")
+
+    base_count = len(racers)
+    racers = _apply_extra_entries(racers, EXTRA_ENTRIES)
+    if len(racers) != base_count:
+        print(f"Applied extra entries: {base_count} commenters -> {len(racers)} marbles.")
 
     track = TrackConfig(
         width=args.width,
