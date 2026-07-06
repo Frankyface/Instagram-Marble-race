@@ -42,6 +42,22 @@ def test_simulate_all_racers_finish_on_a_short_enough_track():
     assert all(rec.t is not None for rec in result.finish_records)
 
 
+def test_finishers_are_frozen_exactly_at_the_finish_line_with_distinct_times():
+    # Arrange
+    racers = _make_racers(8)
+    track = TrackConfig(width=800, length=1200, seed=4)
+    config = RaceConfig(track=track, seed=4, max_duration_s=15)
+    # Act
+    result = simulate(racers, config)
+    finish_times = [rec.t for rec in result.finish_records if rec.t is not None]
+    last_positions = {p.id: p for p in result.frames[-1].positions}
+    finisher_ids = [rec.id for rec in result.finish_records if rec.t is not None]
+    # Assert - frozen exactly at the finish line (not overshot past the wall-less end)
+    assert all(abs(last_positions[rid].y - track.length) < 1e-6 for rid in finisher_ids)
+    # Assert - sub-step interpolation gives every finisher a distinct time (no arbitrary ties)
+    assert len(set(finish_times)) == len(finish_times)
+
+
 def test_simulate_stalls_gracefully_when_the_track_is_too_long_for_the_time_budget():
     # Arrange
     racers = _make_racers(4)

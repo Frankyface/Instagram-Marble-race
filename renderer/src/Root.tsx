@@ -4,7 +4,7 @@ import {COMPOSITION_HEIGHT, COMPOSITION_WIDTH} from './camera';
 import {raceInputPropsSchema} from './schema';
 import {RaceManifest} from './types';
 
-const PODIUM_DURATION_SECONDS = 5;
+const PODIUM_DURATION_SECONDS = 9;
 
 // Minimal placeholder so `remotion studio` has something valid to preview
 // without needing a Node-side manifest load (this file gets bundled for the

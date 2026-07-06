@@ -8,31 +8,43 @@ export const getTrackScale = (trackWidth: number): number => COMPOSITION_WIDTH /
 type Leader = {id: string; y: number};
 
 /**
- * The leader for camera-follow purposes is whoever has the largest y in this
- * frame - this is Stage 1's resolved progress metric (see
- * feature-race-engine.md), carried through to screen space here.
- *
- * Single pass shared by both the camera offset and the "who gets the gold
- * ring" check - originally these were two separate max-by-y scans (one via
- * Math.max, one via reduce), which a code review flagged as a DRY risk (the
- * two could silently diverge if a tie-break rule were ever added to one but
- * not the other).
+ * The "leader" is the marble still racing that's furthest down (largest y below
+ * the finish line). Finished marbles are frozen exactly at `finishY`, so they're
+ * excluded - otherwise the camera and the gold ring would lock onto the winner
+ * frozen at the bottom while the actual race continues above. If everyone has
+ * finished, fall back to the furthest-down overall.
  */
-export const getLeader = (frame: Frame): Leader | undefined =>
-  frame.positions.reduce<Leader | undefined>((leader, position) => {
-    if (!leader || position.y > leader.y) {
-      return {id: position.id, y: position.y};
-    }
-    return leader;
-  }, undefined);
+export const getLeader = (frame: Frame, finishY: number): Leader | undefined => {
+  let live: Leader | undefined;
+  let any: Leader | undefined;
+  for (const p of frame.positions) {
+    if (!any || p.y > any.y) any = {id: p.id, y: p.y};
+    if (p.y >= finishY - 1) continue; // finished / frozen at the line
+    if (!live || p.y > live.y) live = {id: p.id, y: p.y};
+  }
+  return live ?? any;
+};
 
 /**
- * Vertical scroll offset (in screen pixels) that keeps the current leader
- * roughly a third of the way down the frame, so the track scrolls upward as
- * the race progresses - a continuous scroll, no hard cuts.
+ * Precompute a per-frame vertical camera offset that follows the live leader but
+ * only ever scrolls DOWN (running max) - so when the current leader finishes and
+ * the next live leader is higher up, the camera holds instead of snapping back up.
+ * This is the continuous downward scroll of a real marble-race broadcast.
  */
-export const getCameraOffsetY = (leader: Leader | undefined, scale: number): number => {
-  const leaderScreenY = (leader?.y ?? 0) * scale;
-  const keepLeaderAt = COMPOSITION_HEIGHT / 3;
-  return Math.max(leaderScreenY - keepLeaderAt, 0);
+export const computeCameraOffsets = (
+  frames: Frame[],
+  finishY: number,
+  scale: number,
+): number[] => {
+  // Keep the leader near the BOTTOM of the frame so the chasing pack (which is
+  // behind = higher up = smaller y) fills the view above it. Keeping the leader
+  // high up instead wastes the whole lower frame on empty course ahead of it.
+  const keepLeaderAt = COMPOSITION_HEIGHT * 0.8;
+  let running = 0;
+  return frames.map((frame) => {
+    const leader = getLeader(frame, finishY);
+    const target = Math.max((leader?.y ?? 0) * scale - keepLeaderAt, 0);
+    running = Math.max(running, target);
+    return running;
+  });
 };

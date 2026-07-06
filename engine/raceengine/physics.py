@@ -48,7 +48,7 @@ def _spawn_marble_bodies(
         body.position = (x, y)
         shape = pymunk.Circle(body, radius)
         shape.friction = 0.4
-        shape.elasticity = 0.5
+        shape.elasticity = 0.4
         space.add(body, shape)
         bodies[racer.id] = body
         shapes[racer.id] = shape
@@ -75,6 +75,15 @@ def simulate(racers: tuple[Racer, ...], config: RaceConfig) -> SimulationResult:
         for _ in range(steps_per_sample):
             if step >= max_steps:
                 break
+            # Capture pre-step y so a finish can be timed to the exact fraction of
+            # this step at which the marble crossed the line - otherwise every marble
+            # crossing in the same step gets an identical time and ties break by
+            # list order (arbitrary), which made the top placements inaccurate.
+            prev_y = {
+                racer.id: bodies[racer.id].position.y
+                for racer in racers
+                if racer.id not in finish_times
+            }
             space.step(physics_dt)
             step += 1
             t += physics_dt
@@ -82,12 +91,15 @@ def simulate(racers: tuple[Racer, ...], config: RaceConfig) -> SimulationResult:
                 if racer.id in finish_times:
                     continue
                 body = bodies[racer.id]
-                if body.position.y >= finish_y:
-                    finish_times[racer.id] = t
-                    # Freeze the marble at its finish position instead of letting it
-                    # free-fall forever past the (wall-less) end of the track.
+                y = body.position.y
+                if y >= finish_y:
+                    y0 = prev_y.get(racer.id, y)
+                    frac = 1.0 if y <= y0 else max(0.0, min(1.0, (finish_y - y0) / (y - y0)))
+                    finish_times[racer.id] = (t - physics_dt) + physics_dt * frac
+                    # Freeze exactly at the finish line (not wherever it overshot to),
+                    # so it doesn't free-fall past the wall-less end of the track.
                     frozen_positions[racer.id] = FramePosition(
-                        id=racer.id, x=body.position.x, y=body.position.y
+                        id=racer.id, x=body.position.x, y=finish_y
                     )
                     space.remove(body, shapes[racer.id])
 

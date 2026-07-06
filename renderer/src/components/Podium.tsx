@@ -1,5 +1,5 @@
 import {memo} from 'react';
-import {Img} from 'remotion';
+import {Img, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Placement, Racer} from '../types';
 import {COMPOSITION_HEIGHT, COMPOSITION_WIDTH} from '../camera';
 
@@ -7,7 +7,14 @@ type PodiumProps = {
   results: Placement[];
   racersById: Record<string, Racer>;
   avatarSrcById: Record<string, string>;
+  /** Absolute frame at which the podium phase begins (= race frame count). */
+  podiumStartFrame: number;
 };
+
+const TOP_N = 25;
+const HEADER_HEIGHT = 200;
+const ROW_HEIGHT = 132; // big + readable
+const AVATAR = 88;
 
 const PLACE_ACCENT_COLORS: Record<number, string> = {
   1: '#ffd700',
@@ -16,20 +23,28 @@ const PLACE_ACCENT_COLORS: Record<number, string> = {
 };
 
 /**
- * Resolves feature-video-composition.md's podium open question: a simple
- * ranked list (not a literal podium graphic with stands), showing every
- * racer's placement per the v1 scope decision, not just the top 3. Row
- * height is derived from the result count so it always fits the fixed
- * video height regardless of how many racers were in the field.
- *
- * Memoized: props are constant across the whole podium phase (~150 frames),
- * so without this every frame was rebuilding ~30 identical row elements.
+ * Results screen: shows the top 25 at a large, readable size and auto-scrolls
+ * down through them over the podium phase (72+ tiny rows crammed on one screen
+ * was unreadable). The header stays pinned; only the list scrolls.
  */
-function PodiumComponent({results, racersById, avatarSrcById}: PodiumProps) {
-  const headerHeight = 160;
-  const availableHeight = COMPOSITION_HEIGHT - headerHeight - 40;
-  const rowHeight = Math.min(availableHeight / results.length, 90);
-  const avatarSize = Math.min(rowHeight * 0.75, 64);
+function PodiumComponent({results, racersById, avatarSrcById, podiumStartFrame}: PodiumProps) {
+  const frame = useCurrentFrame();
+  const {durationInFrames} = useVideoConfig();
+
+  const top = [...results].sort((a, b) => a.place - b.place).slice(0, TOP_N);
+  const listViewport = COMPOSITION_HEIGHT - HEADER_HEIGHT;
+  const contentHeight = top.length * ROW_HEIGHT;
+  const maxScroll = Math.max(contentHeight - listViewport, 0);
+
+  // Hold at the top briefly, scroll to the bottom, hold at the bottom.
+  const podiumFrames = Math.max(durationInFrames - podiumStartFrame, 1);
+  const local = frame - podiumStartFrame;
+  const scroll = interpolate(
+    local,
+    [0, podiumFrames * 0.18, podiumFrames * 0.9, podiumFrames],
+    [0, 0, maxScroll, maxScroll],
+    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+  );
 
   return (
     <div
@@ -37,66 +52,70 @@ function PodiumComponent({results, racersById, avatarSrcById}: PodiumProps) {
         position: 'absolute',
         inset: 0,
         backgroundColor: '#1c1c28',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
         fontFamily: 'sans-serif',
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
-          height: headerHeight,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: COMPOSITION_WIDTH,
+          height: HEADER_HEIGHT,
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           color: 'white',
-          fontSize: 56,
-          fontWeight: 700,
-          letterSpacing: 4,
+          fontSize: 72,
+          fontWeight: 800,
+          letterSpacing: 6,
+          zIndex: 2,
+          background: 'linear-gradient(#1c1c28 70%, rgba(28,28,40,0))',
         }}
       >
         RESULTS
       </div>
-      <div style={{width: COMPOSITION_WIDTH - 80}}>
-        {results.map((placement) => {
+      <div style={{position: 'absolute', top: HEADER_HEIGHT - scroll, left: 0, width: COMPOSITION_WIDTH}}>
+        {top.map((placement) => {
           const racer = racersById[placement.id];
-          const avatarSrc = avatarSrcById[placement.id];
           const accent = PLACE_ACCENT_COLORS[placement.place];
           return (
             <div
               key={placement.id}
               style={{
-                height: rowHeight,
+                height: ROW_HEIGHT,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 20,
-                borderBottom: '1px solid #33334a',
-                padding: '0 12px',
+                gap: 28,
+                padding: '0 56px',
+                borderBottom: '1px solid #2c2c40',
               }}
             >
               <div
                 style={{
-                  width: 56,
+                  width: 96,
                   textAlign: 'right',
-                  color: accent ?? '#aaaaaa',
-                  fontSize: Math.min(rowHeight * 0.4, 36),
-                  fontWeight: 700,
+                  color: accent ?? '#8a8aa0',
+                  fontSize: 60,
+                  fontWeight: 800,
                 }}
               >
                 {placement.place}
               </div>
               <div
                 style={{
-                  width: avatarSize,
-                  height: avatarSize,
+                  width: AVATAR,
+                  height: AVATAR,
                   borderRadius: '50%',
                   overflow: 'hidden',
-                  border: accent ? `3px solid ${accent}` : '2px solid #555555',
+                  border: accent ? `5px solid ${accent}` : '3px solid #555',
                   flexShrink: 0,
                 }}
               >
-                <Img src={avatarSrc} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                <Img src={avatarSrcById[placement.id]} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
               </div>
-              <div style={{color: 'white', fontSize: Math.min(rowHeight * 0.35, 32)}}>
+              <div style={{color: 'white', fontSize: 46, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                 {racer?.username ?? placement.id}
               </div>
             </div>

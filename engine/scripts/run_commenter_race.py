@@ -65,12 +65,14 @@ def main() -> None:
         default=None,
         help="re-simulate from an existing manifest's racers (skips the live fetch)",
     )
-    # Track tuning: big marbles + a short track make a legible sprint where the
-    # first marble across the line is clearly the winner.
+    # Track tuning: big marbles (visible) on a long, busy course. It's long enough
+    # to be a real race and given enough time that (nearly) everyone actually crosses
+    # the line, so placements are real finish-order rather than depth-ranked stragglers.
     parser.add_argument("--width", type=float, default=720.0)
-    parser.add_argument("--length", type=float, default=3200.0)
+    parser.add_argument("--length", type=float, default=4000.0)
     parser.add_argument("--marble-radius", type=float, default=32.0)
-    parser.add_argument("--max-duration", type=float, default=20.0)
+    parser.add_argument("--rows", type=int, default=18, help="peg rows (course complexity)")
+    parser.add_argument("--max-duration", type=float, default=32.0)
     parser.add_argument(
         "--output", type=Path, default=_ENGINE_ROOT / "output" / "commenter_race.json"
     )
@@ -105,7 +107,7 @@ def main() -> None:
         length=args.length,
         marble_radius=args.marble_radius,
         obstacle_radius=args.marble_radius * 0.7,
-        obstacle_rows=9,
+        obstacle_rows=args.rows,
         obstacles_per_row=5,
         seed=args.seed,
     )

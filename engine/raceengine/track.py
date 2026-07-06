@@ -51,7 +51,9 @@ def generate_obstacles(config: TrackConfig) -> tuple[Obstacle, ...]:
 def build_space(config: TrackConfig) -> tuple[pymunk.Space, tuple[Obstacle, ...]]:
     """Build a pymunk.Space containing the track's static side walls and peg obstacles."""
     space = pymunk.Space()
-    space.gravity = (0, 900)
+    # Moderate gravity keeps the pack bunched (several marbles on screen at once)
+    # while still flowing down a long, busy course to real finishes.
+    space.gravity = (0, 1200)
 
     static_body = space.static_body
     half_thickness = config.wall_thickness / 2
@@ -69,7 +71,7 @@ def build_space(config: TrackConfig) -> tuple[pymunk.Space, tuple[Obstacle, ...]
     for obstacle in obstacles:
         shape = pymunk.Circle(static_body, obstacle.radius, (obstacle.position.x, obstacle.position.y))
         shape.friction = 0.4
-        shape.elasticity = 0.6
+        shape.elasticity = 0.5
         space.add(shape)
 
     return space, obstacles

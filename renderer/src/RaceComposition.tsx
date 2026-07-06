@@ -1,7 +1,7 @@
 import {useMemo} from 'react';
 import {AbsoluteFill, Audio, staticFile, useCurrentFrame} from 'remotion';
 import {RaceManifest} from './types';
-import {COMPOSITION_WIDTH, getCameraOffsetY, getLeader, getTrackScale} from './camera';
+import {COMPOSITION_WIDTH, computeCameraOffsets, getLeader, getTrackScale} from './camera';
 import {Track} from './components/Track';
 import {Marble} from './components/Marble';
 import {Podium} from './components/Podium';
@@ -37,12 +37,17 @@ export function RaceComposition({manifest, avatarStaticPathById}: RaceCompositio
       ),
     [avatarStaticPathById],
   );
+  // Precomputed once: a monotonic downward camera track following the live leader.
+  const cameraOffsets = useMemo(
+    () => computeCameraOffsets(manifest.frames, manifest.track.length, scale),
+    [manifest.frames, manifest.track.length, scale],
+  );
 
   // raceFrameCount can be 0 for a degenerate manifest (e.g. zero racers) - guard
-  // against indexing frames[-1], which would otherwise crash deep in getCameraOffsetY.
+  // against indexing frames[-1], which would otherwise crash below.
   const currentFrame = raceFrameCount > 0 ? manifest.frames[Math.min(frameIndex, raceFrameCount - 1)] : null;
-  const leader = currentFrame ? getLeader(currentFrame) : undefined;
-  const cameraOffsetY = getCameraOffsetY(leader, scale);
+  const leader = currentFrame ? getLeader(currentFrame, manifest.track.length) : undefined;
+  const cameraOffsetY = raceFrameCount > 0 ? cameraOffsets[Math.min(frameIndex, raceFrameCount - 1)] : 0;
 
   return (
     <AbsoluteFill style={{backgroundColor: '#0e0e18', overflow: 'hidden'}}>
@@ -54,6 +59,7 @@ export function RaceComposition({manifest, avatarStaticPathById}: RaceCompositio
           results={manifest.results}
           racersById={racersById}
           avatarSrcById={resolvedAvatarSrcById}
+          podiumStartFrame={raceFrameCount}
         />
       ) : (
         <div style={{position: 'absolute', left: 0, top: -cameraOffsetY, width: COMPOSITION_WIDTH}}>
