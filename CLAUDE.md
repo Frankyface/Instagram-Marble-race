@@ -39,7 +39,17 @@ When the user says this, automatically:
 - Many small files over few large ones — 200-400 lines typical, 800 max.
 
 ## How to run / test
-(Fill in once the toolchain is scaffolded in Stage 1 — see `staging/stage-1-core-engine/overview.md`.)
+Python engine lives in `engine/` with its own venv:
+```
+cd engine
+.venv/Scripts/python.exe -m pytest --cov=raceengine --cov=sources --cov-report=term-missing
+.venv/Scripts/python.exe scripts/run_sample_race.py --count 30 --seed 1
+```
+If `fixtures/avatars/` is empty, regenerate placeholder avatars first:
+```
+.venv/Scripts/python.exe fixtures/generate_placeholder_avatars.py --count 40
+```
+(Remotion project for rendering doesn't exist yet — added in Stage 2.)
 
 ## Branching / commits
 - `main` is always deployable/demo-able.

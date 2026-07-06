@@ -6,6 +6,8 @@ __pycache__/
 venv/
 *.egg
 .pytest_cache/
+.coverage
+htmlcov/
 
 # Node / Remotion
 node_modules/
@@ -18,6 +20,8 @@ out/
 *.mp4
 race-manifests/
 avatars-cache/
+engine/output/
+engine/fixtures/avatars/
 *.log
 
 # OS

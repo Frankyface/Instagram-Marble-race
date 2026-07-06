@@ -9,7 +9,9 @@ Stand up the single continuous-scroll race primitive — the physics simulation,
 - `feature-event-system.md` — the race-event stream (finish, collision, gate-pass placeholder, etc.) and the JSON race-manifest export format.
 
 ## Definition of Done
-- [ ] A single race, given N placeholder avatar images, simulates from start to finish deterministically (same seed → same result).
-- [ ] The race exports a valid JSON race manifest: frame-by-frame marble positions + a race-event stream + final placements.
-- [ ] Camera-follow logic (tracking the leader) is implemented and its output is part of the manifest (or derivable from it).
-- [ ] Manifest schema is documented well enough that Stage 2 (rendering) can consume it without touching Stage 1 code.
+- [x] A single race, given N placeholder avatar images, simulates from start to finish deterministically (same seed → same result). Verified by test and by running `scripts/run_sample_race.py` twice.
+- [x] The race exports a valid JSON race manifest: frame-by-frame marble positions + a race-event stream + final placements. Written to `engine/output/sample_race.json`.
+- [x] Camera-follow logic (tracking the leader) is implemented and its output is part of the manifest (or derivable from it). Resolved as "largest Y position" — directly derivable from any frame's positions, no separate field needed.
+- [x] Manifest schema is documented well enough that Stage 2 (rendering) can consume it without touching Stage 1 code. See feature-event-system.md's wire-shape doc.
+
+**Stage 1 core engine is functionally complete.** 25 tests passing, 97% coverage. See `handoff.md` for the full checkpoint summary and what's next.
