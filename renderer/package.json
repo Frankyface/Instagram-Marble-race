@@ -1,0 +1,25 @@
+{
+  "name": "followers-marble-race-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "node scripts/render.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.485",
+    "@remotion/cli": "4.0.485",
+    "@remotion/renderer": "4.0.485",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remotion": "4.0.485",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.3"
+  }
+}

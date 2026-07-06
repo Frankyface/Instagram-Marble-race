@@ -57,7 +57,7 @@ def _spawn_marble_bodies(
 
 def simulate(racers: tuple[Racer, ...], config: RaceConfig) -> SimulationResult:
     track = config.track
-    space, _obstacles = build_space(track)
+    space, obstacles = build_space(track)
     bodies, shapes = _spawn_marble_bodies(space, racers, config)
 
     physics_dt = 1.0 / config.physics_hz
@@ -122,5 +122,6 @@ def simulate(racers: tuple[Racer, ...], config: RaceConfig) -> SimulationResult:
         frames=tuple(frames),
         finish_order=finish_order,
         finish_records=finish_records,
+        obstacles=obstacles,
         stalled=stalled,
     )

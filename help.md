@@ -5,8 +5,9 @@ _Things only I (the human) can do. Check off as completed._
 - [ ] None — Stage 1 only needs local placeholder images + a Python environment, nothing external.
 
 ## Blocks Stage 2 (Rendering Pipeline)
-- [ ] Install Node.js + set up a Remotion project (`npx create-video@latest`) — needed before any rendering work starts.
-- [ ] Pick/source a royalty-free looping background music track (or a small library of a few tracks) for the video's audio bed — e.g. YouTube Audio Library, Pixabay Music, or a licensed source. Confirm it's safe to use on a video posted to Instagram.
+- [x] Node.js (v24.15.0) + npm (11.16.0) confirmed installed. Remotion project scaffolded manually in `renderer/` rather than via the interactive `npx create-video@latest` wizard (not usable in a non-interactive shell) — same end result, hand-written `package.json`/`remotion.config.ts`/`src/Root.tsx`.
+- [x] Rendering pipeline built and verified end-to-end (`node scripts/render.mjs`) — real 30-racer manifest renders into a 1080x1920 MP4 with track/marbles/camera-follow/podium and an audio track.
+- [ ] **Pick/source a real royalty-free looping background music track** for the video's audio bed — e.g. YouTube Audio Library, Pixabay Music, or a licensed source. Confirm it's safe to use on a video posted to Instagram. A silent placeholder (`renderer/public/audio/background.wav`, generated locally) stands in for now; once you have a real track, replace that file (keep the `.wav` extension, or update the `src` field in `renderer/src/audio.ts`'s `backgroundMusic` subscriber if using a different format like `.mp3`) — no other code changes needed.
 
 ## Blocks Stage 3 (Real Data Sources)
 - [ ] **Official export path**: Go to Instagram → Settings → "Download Your Information," request a JSON export of your account data (includes your followers list). This can take a few hours to a day for Instagram to generate — request it early since Stage 3 needs a real export to build the parser against.

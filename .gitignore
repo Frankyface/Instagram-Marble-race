@@ -22,6 +22,8 @@ race-manifests/
 avatars-cache/
 engine/output/
 engine/fixtures/avatars/
+renderer/output/
+renderer/public/avatars/
 *.log
 
 # OS

@@ -7,7 +7,11 @@ def _result(finish_order, finish_times, stalled=False):
     frames = (Frame(t=1.0, positions=tuple(FramePosition(id=rid, x=0, y=0) for rid in finish_order)),)
     records = tuple(FinishRecord(id=rid, t=finish_times.get(rid)) for rid in finish_order)
     return SimulationResult(
-        frames=frames, finish_order=tuple(finish_order), finish_records=records, stalled=stalled
+        frames=frames,
+        finish_order=tuple(finish_order),
+        finish_records=records,
+        obstacles=(),
+        stalled=stalled,
     )
 
 

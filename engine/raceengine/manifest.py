@@ -15,15 +15,17 @@ from raceengine.models import (
     Racer,
     RaceEvent,
     RaceManifest,
+    TrackInfo,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def build_manifest(
     race_id: str,
     seed: int,
     fps: int,
+    track: TrackInfo,
     racers: tuple[Racer, ...],
     frames: tuple[Frame, ...],
     events: tuple[RaceEvent, ...],
@@ -34,6 +36,7 @@ def build_manifest(
         race_id=race_id,
         seed=seed,
         fps=fps,
+        track=track,
         racers=tuple(racers),
         frames=tuple(frames),
         events=tuple(events),
@@ -47,6 +50,16 @@ def manifest_to_dict(manifest: RaceManifest) -> dict:
         "raceId": manifest.race_id,
         "seed": manifest.seed,
         "fps": manifest.fps,
+        "track": {
+            "width": manifest.track.width,
+            "length": manifest.track.length,
+            "wallThickness": manifest.track.wall_thickness,
+            "marbleRadius": manifest.track.marble_radius,
+            "obstacles": [
+                {"x": obstacle.position.x, "y": obstacle.position.y, "radius": obstacle.radius}
+                for obstacle in manifest.track.obstacles
+            ],
+        },
         "racers": [
             {"id": racer.id, "username": racer.username, "avatarPath": racer.avatar_path}
             for racer in manifest.racers

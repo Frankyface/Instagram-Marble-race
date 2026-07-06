@@ -8,6 +8,7 @@ A personal tool that turns an Instagram account's followers into marbles in a ph
 - **Rendering (Remotion / React+TypeScript)**: consumes the JSON race manifest and renders the final vertical MP4. Chosen because Remotion is purpose-built for data→video pipelines and ships a browser-based Player — a natural path to a future web app without a rewrite.
 - **Render style**: intentionally simple 2D graphics — flat marbles with circular-cropped avatar textures, a basic track, clean vertical layout. Visual polish is explicitly NOT a v1 goal; the renderer was flagged as the biggest risk, so keep it simple rather than chasing polish.
 - **Audio**: event-driven audio layer. v1 ships background music only (looping royalty-free track), but the system is built so SFX (collision thud, gate ding, finish stinger) can slot in later against the same race-event stream without rework.
+- **Important Remotion constraint** (discovered building Stage 2): everything under `renderer/src/` gets bundled by webpack for the browser/headless-Chrome render context — this means **no `fs`/`path`/file I/O anywhere in `src/`**, including inside `calculateMetadata`. Any code that needs to read the manifest JSON or copy avatar files must live in `renderer/scripts/` (plain Node scripts, not bundled) and pass fully-resolved data into the composition as `inputProps`.
 
 ## Core architecture
 Single continuous-scroll race (camera follows the leader) is the core primitive. Two modes are composed on top of it — NOT built as separate engines:
@@ -49,7 +50,15 @@ If `fixtures/avatars/` is empty, regenerate placeholder avatars first:
 ```
 .venv/Scripts/python.exe fixtures/generate_placeholder_avatars.py --count 40
 ```
-(Remotion project for rendering doesn't exist yet — added in Stage 2.)
+
+Remotion renderer lives in `renderer/` (Node/TypeScript, own `node_modules`):
+```
+cd renderer
+npm run typecheck
+npm run render                          # renders engine/output/sample_race.json -> renderer/output/race.mp4
+node scripts/render.mjs --manifest <path> --out <path>   # render a specific manifest
+npm run dev                             # remotion studio, previews against a small embedded placeholder manifest
+```
 
 ## Branching / commits
 - `main` is always deployable/demo-able.

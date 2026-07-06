@@ -101,7 +101,21 @@ class SimulationResult:
     frames: tuple[Frame, ...]
     finish_order: tuple[str, ...]
     finish_records: tuple[FinishRecord, ...]
+    obstacles: tuple[Obstacle, ...]
     stalled: bool
+
+
+@dataclass(frozen=True)
+class TrackInfo:
+    """Static track geometry, carried in the manifest so the renderer can draw the
+    track without regenerating it - Stage 2 needs this and Stage 1's manifest didn't
+    originally include it (found while building the Remotion consumer)."""
+
+    width: float
+    length: float
+    wall_thickness: float
+    marble_radius: float
+    obstacles: tuple[Obstacle, ...]
 
 
 @dataclass(frozen=True)
@@ -110,6 +124,7 @@ class RaceManifest:
     race_id: str
     seed: int
     fps: int
+    track: TrackInfo
     racers: tuple[Racer, ...]
     frames: tuple[Frame, ...]
     events: tuple[RaceEvent, ...]

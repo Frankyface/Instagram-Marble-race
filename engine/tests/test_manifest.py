@@ -2,7 +2,16 @@
 import json
 
 from raceengine.manifest import SCHEMA_VERSION, build_manifest, manifest_to_dict, write_manifest
-from raceengine.models import Frame, FramePosition, Placement, Racer, RaceEvent
+from raceengine.models import (
+    Frame,
+    FramePosition,
+    Obstacle,
+    Placement,
+    Racer,
+    RaceEvent,
+    TrackInfo,
+    Vec2,
+)
 
 
 def _sample_manifest():
@@ -10,8 +19,22 @@ def _sample_manifest():
     frames = (Frame(t=0.0, positions=(FramePosition(id="a", x=1.0, y=2.0),)),)
     events = (RaceEvent(t=0.0, type="race_complete", payload={}),)
     results = (Placement(id="a", place=1),)
+    track = TrackInfo(
+        width=800.0,
+        length=4000.0,
+        wall_thickness=20.0,
+        marble_radius=15.0,
+        obstacles=(Obstacle(position=Vec2(x=100.0, y=200.0), radius=12.0),),
+    )
     return build_manifest(
-        race_id="race-1", seed=1, fps=30, racers=racers, frames=frames, events=events, results=results
+        race_id="race-1",
+        seed=1,
+        fps=30,
+        track=track,
+        racers=racers,
+        frames=frames,
+        events=events,
+        results=results,
     )
 
 
@@ -33,6 +56,13 @@ def test_manifest_to_dict_produces_the_documented_wire_shape():
     assert data["frames"][0] == {"t": 0.0, "positions": [{"id": "a", "x": 1.0, "y": 2.0}]}
     assert data["events"][0] == {"t": 0.0, "type": "race_complete", "payload": {}}
     assert data["results"][0] == {"id": "a", "place": 1}
+    assert data["track"] == {
+        "width": 800.0,
+        "length": 4000.0,
+        "wallThickness": 20.0,
+        "marbleRadius": 15.0,
+        "obstacles": [{"x": 100.0, "y": 200.0, "radius": 12.0}],
+    }
 
 
 def test_write_manifest_round_trips_through_json(tmp_path):

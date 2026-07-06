@@ -63,18 +63,18 @@ Both goals must NOT be architecturally foreclosed by v1 decisions — in particu
 
 ## Staged Roadmap
 
-| Stage | Goal | Headline Feature |
-|---|---|---|
-| 1 — Core Race Engine | Stand up the single continuous-scroll race primitive with physics + event stream, against local placeholder avatars | A single race simulates end-to-end and exports a valid JSON race manifest |
-| 2 — Rendering Pipeline | Build the Remotion composition that consumes a race manifest and renders a finished video | A JSON manifest becomes a shareable vertical MP4, with music |
-| 3 — Real Data Sources | Build both `FollowerSource` adapters (official export + instagrapi) behind the common interface | A race video generates from a real Instagram account's actual followers |
-| 4 — Elimination Mode | Add gated panel-reset logic on top of the core engine | Elimination races (gate cutoffs, panel resets) work end-to-end |
-| 5 — Brackets Mode | Add multi-race tournament composition (configurable rounds, top-X advances) on top of the core engine | Full bracket tournaments, feeding into a final race, work end-to-end |
+| Stage | Goal | Headline Feature | Status |
+|---|---|---|---|
+| 1 — Core Race Engine | Stand up the single continuous-scroll race primitive with physics + event stream, against local placeholder avatars | A single race simulates end-to-end and exports a valid JSON race manifest | ✅ Done, 12/12 verification criteria pass |
+| 2 — Rendering Pipeline | Build the Remotion composition that consumes a race manifest and renders a finished video | A JSON manifest becomes a shareable vertical MP4, with music | ✅ Done, verified via a real 30-racer render |
+| 3 — Real Data Sources | Build both `FollowerSource` adapters (official export + instagrapi) behind the common interface | A race video generates from a real Instagram account's actual followers | Next up |
+| 4 — Elimination Mode | Add gated panel-reset logic on top of the core engine | Elimination races (gate cutoffs, panel resets) work end-to-end | Not started — will need real changes to `physics.py`, see feature-race-engine.md |
+| 5 — Brackets Mode | Add multi-race tournament composition (configurable rounds, top-X advances) on top of the core engine | Full bracket tournaments, feeding into a final race, work end-to-end | Not started — engine already supports this |
 
 (Stages 6+ — web app, scheduled posting — are future-horizon, not yet broken into stage folders; see Future Roadmap above.)
 
 ## Open Questions & Risks
-- **Renderer complexity** (flagged as biggest risk) — mitigated by deliberately simple 2D visuals; revisit only if v1 output looks too rough to be shareable.
+- **Renderer complexity** (flagged as biggest risk) — resolved: Stage 2 shipped and a real 30-racer manifest renders correctly (verified via extracted frames). Simple flat 2D visuals held up fine; no further mitigation needed unless real Instagram avatars (Stage 3) reveal new issues.
 - **Instagram ban/flag risk** on the `instagrapi` adapter — mitigated by keeping the official-export adapter as the zero-risk default path; `instagrapi` is opt-in per use.
 - **Avatar count/track scaling** — how many marbles can realistically race at once before the track/physics/readability breaks down? Needs empirical testing in Stage 1.
 - **Camera-follow logic** — "follows the leader" needs a concrete definition (furthest arc-length along track? simple Y-position?) — to be resolved in Stage 1.
