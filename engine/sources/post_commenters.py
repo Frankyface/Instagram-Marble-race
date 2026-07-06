@@ -4,22 +4,25 @@ Constructed with a post URL (not an account handle), mirroring LocalFolderSource
 "the source carries its own target" pattern, so `fetch()` stays uniform with the
 rest of the FollowerSource family and the engine/renderer need no changes.
 
-Requires a logged-in instaloader session at run time - Instagram gates both
-comment retrieval and HD profile pictures behind login. Credentials come from the
-environment (IG_USERNAME / IG_PASSWORD / optional IG_2FA_CODE); a local `.env` is
-the intended place for them (already gitignored), never committed.
+Uses `instagrapi` (the private mobile-API client). We originally built this on
+`instaloader`, but against current Instagram its comment/metadata endpoints are
+blocked (web GraphQL returns "execution error", the mobile fallback returns a
+generic "fail") even with a valid session - while instagrapi's fuller mobile-app
+emulation succeeds. Auth is by a browser `sessionid` (IG_SESSIONID), which avoids
+the fresh-login throttle that a username/password login trips.
 
-`instaloader` is imported lazily (only inside the methods that actually hit the
-network), so this module - and its test suite - import fine without instaloader
-installed. Install it (declared in pyproject) before an actual live run.
+`instagrapi` and `requests` are imported lazily (only inside the methods that hit
+the network), so this module - and its test suite - import fine without them
+installed. The creds live in a local `.env` (gitignored), never committed.
 """
 from __future__ import annotations
 
 import logging
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Mapping, Optional, Protocol
+from typing import Iterable, List, Mapping, Optional
 from urllib.parse import urlparse
 
 from raceengine.models import Racer
@@ -35,36 +38,13 @@ _ALLOWED_AVATAR_HOSTS = ("cdninstagram.com", "fbcdn.net")
 _IMAGE_MAGIC = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")  # JPEG, PNG
 
 
-class CommentOwner(Protocol):
-    userid: object
+@dataclass(frozen=True)
+class Owner:
+    """A commenter, normalised out of an instagrapi Comment's `user`."""
+
+    userid: int
     username: str
     profile_pic_url: str
-
-
-class CommentReply(Protocol):
-    owner: CommentOwner
-
-
-class Comment(Protocol):
-    owner: CommentOwner
-    answers: Iterable[CommentReply]
-
-
-class RawResponse(Protocol):
-    content: bytes
-
-
-class LoaderContext(Protocol):
-    def get_raw(self, url: str) -> RawResponse: ...
-
-
-class Loader(Protocol):
-    context: LoaderContext
-
-    def load_session_from_file(self, username: str) -> None: ...
-    def login(self, user: str, password: str) -> None: ...
-    def two_factor_login(self, code: str) -> None: ...
-    def save_session_to_file(self) -> None: ...
 
 
 class PostUnavailableError(RuntimeError):
@@ -75,8 +55,7 @@ def extract_shortcode(url: str) -> str:
     """Pull the shortcode out of a /p/, /reel/, or /tv/ Instagram post URL.
 
     Validates that the URL is actually a post URL (not a profile URL or garbage)
-    rather than blindly taking the last path segment - instaloader ships no URL
-    parser of its own.
+    rather than blindly taking the last path segment.
     """
     match = _POST_PATH_RE.search(urlparse(url).path)
     if not match:
@@ -90,8 +69,8 @@ class PostCommentersSource:
     """Races the commenters of one post. Satisfies the FollowerSource Protocol.
 
     By default: one marble per unique commenter (deduped by user id), top-level
-    comments only, no cap. `extra_entries` lets you hand a specific commenter
-    bonus marbles (same face/name, distinct marble ids).
+    comments, no cap. `extra_entries` lets you hand a specific commenter bonus
+    marbles (same face/name, distinct marble ids).
     """
 
     def __init__(
@@ -99,31 +78,29 @@ class PostCommentersSource:
         post_url: str,
         *,
         cache_dir: Path,
-        ig_username: Optional[str] = None,
-        loader: Optional[Loader] = None,
-        include_replies: bool = False,
+        sessionid: Optional[str] = None,
+        client: Optional[object] = None,
         max_commenters: Optional[int] = None,
         extra_entries: Optional[Mapping[str, int]] = None,
     ) -> None:
-        self._shortcode = extract_shortcode(post_url)
+        self._url = post_url
+        self._shortcode = extract_shortcode(post_url)  # validates it is a post URL
         self._cache_dir = Path(cache_dir)
-        self._include_replies = include_replies
         self._max_commenters = max_commenters
         self._extra_entries = {k.lower(): v for k, v in (extra_entries or {}).items()}
-        self._username = ig_username or os.environ.get("IG_USERNAME", "")
-        self._loader: Optional[Loader] = loader
+        self._sessionid = sessionid or os.environ.get("IG_SESSIONID", "")
+        self._client = client
 
     def fetch(self, limit: Optional[int] = None) -> tuple[Racer, ...]:
-        if not self._username:
+        if self._client is None and not self._sessionid:
             raise ValueError(
-                "No Instagram username configured (set IG_USERNAME or pass ig_username); "
-                "login is required to read a post's comments."
+                "No Instagram session configured (set IG_SESSIONID or pass a client); "
+                "a logged-in session is required to read a post's comments."
             )
         cap = self._effective_cap(limit)
-        self._ensure_loader()
-        self._ensure_login()
+        client = self._ensure_client()
         self._cache_dir.mkdir(parents=True, exist_ok=True)
-        owners = self._load_owners(cap)
+        owners = self._load_owners(client, cap)
         return self._build_racers(owners)
 
     # -- pure logic (network-free, unit-tested directly) ----------------------
@@ -132,40 +109,29 @@ class PostCommentersSource:
         caps = [c for c in (limit, self._max_commenters) if c is not None]
         return min(caps) if caps else None
 
-    def _collect_owners(
-        self, comments: Iterable[Comment], cap: Optional[int]
-    ) -> List[CommentOwner]:
-        """Deduplicate commenters (and optionally reply authors) by user id,
-        preserving first-seen order, stopping once `cap` unique owners are found."""
+    def _dedupe(self, owners: Iterable[Owner], cap: Optional[int]) -> List[Owner]:
+        """Deduplicate commenters by user id, preserving first-seen order, stopping
+        once `cap` unique owners are found."""
         if cap is not None and cap <= 0:
             return []
         seen: set = set()
-        owners: List[CommentOwner] = []
-        for comment in comments:
-            candidates: List[CommentOwner] = [comment.owner]
-            if self._include_replies:
-                candidates.extend(answer.owner for answer in comment.answers)
-            for owner in candidates:
-                if owner.userid in seen:
-                    continue
-                seen.add(owner.userid)
-                owners.append(owner)
-                if cap is not None and len(owners) >= cap:
-                    return owners
-        return owners
+        result: List[Owner] = []
+        for owner in owners:
+            if owner.userid in seen:
+                continue
+            seen.add(owner.userid)
+            result.append(owner)
+            if cap is not None and len(result) >= cap:
+                break
+        return result
 
-    def _build_racers(self, owners: Iterable[CommentOwner]) -> tuple[Racer, ...]:
+    def _build_racers(self, owners: Iterable[Owner]) -> tuple[Racer, ...]:
         racers: List[Racer] = []
         for owner in owners:
-            try:
-                user_id = int(owner.userid)  # numeric -> unique ids + safe filenames
-            except (TypeError, ValueError):
-                logger.warning("Skipping commenter with non-numeric id: %r", owner.userid)
-                continue
-            avatar_path = self._ensure_avatar(owner, user_id)
+            avatar_path = self._ensure_avatar(owner)
             if avatar_path is None:
                 continue  # no usable avatar -> drop this commenter rather than crash
-            base_id = f"ig-{user_id}"
+            base_id = f"ig-{owner.userid}"
             avatar = str(avatar_path)
             racers.append(Racer(id=base_id, username=owner.username, avatar_path=avatar))
             # extra marbles for a boosted commenter: same face/name, unique ids
@@ -175,8 +141,8 @@ class PostCommentersSource:
                 )
         return tuple(racers)
 
-    def _ensure_avatar(self, owner: CommentOwner, user_id: int) -> Optional[Path]:
-        dest = self._cache_dir / f"{user_id}{_AVATAR_SUFFIX}"
+    def _ensure_avatar(self, owner: Owner) -> Optional[Path]:
+        dest = self._cache_dir / f"{owner.userid}{_AVATAR_SUFFIX}"
         if dest.exists():
             return dest
         try:
@@ -184,80 +150,65 @@ class PostCommentersSource:
         except Exception as exc:  # noqa: BLE001 - a failed avatar must not kill the race
             logger.warning(
                 "Skipping @%s (%s): could not fetch avatar: %s",
-                getattr(owner, "username", "?"),
-                user_id,
+                owner.username,
+                owner.userid,
                 exc,
             )
             return None
         return dest
 
-    # -- network / instaloader (lazy imports, patched in tests) ---------------
+    # -- network / instagrapi (lazy imports, injected in tests) ---------------
 
-    def _ensure_loader(self) -> Loader:
-        if self._loader is None:
-            import instaloader
+    def _ensure_client(self) -> object:
+        if self._client is None:
+            from instagrapi import Client
 
-            self._loader = instaloader.Instaloader(quiet=True)
-        return self._loader
+            client = Client()
+            client.login_by_sessionid(self._sessionid)
+            self._client = client
+        return self._client
 
-    def _ensure_login(self) -> None:
-        """Reuse a saved session if present; otherwise log in once and persist it.
+    def _load_owners(self, client: object, cap: Optional[int]) -> List[Owner]:
+        from instagrapi.exceptions import MediaNotFound
 
-        The password is read from the environment only when a fresh login is
-        unavoidable, and never stored anywhere but instaloader's own session file.
-        """
-        from instaloader.exceptions import TwoFactorAuthRequiredException
-
-        loader = self._ensure_loader()
+        # URL -> media_pk is a pure parse in instagrapi; a URL that slips past
+        # extract_shortcode but that instagrapi can't parse raises ValueError/IndexError.
         try:
-            loader.load_session_from_file(self._username)
-            logger.info("Loaded saved instaloader session for %s", self._username)
-            return
-        except FileNotFoundError:
-            pass
-
-        password = os.environ.get("IG_PASSWORD")
-        if not password:
-            raise ValueError(
-                "No saved instaloader session and IG_PASSWORD is not set; cannot log in."
-            )
+            media_pk = client.media_pk_from_url(self._url)
+        except (ValueError, IndexError, TypeError) as exc:
+            raise PostUnavailableError(f"Could not resolve a post from URL {self._url!r}.") from exc
+        # A genuinely missing/private post surfaces as MediaNotFound; rate-limit and
+        # other transient errors are intentionally left to propagate to the caller.
         try:
-            loader.login(self._username, password)
-        except TwoFactorAuthRequiredException:
-            code = os.environ.get("IG_2FA_CODE")
-            if not code:
-                raise
-            loader.two_factor_login(code)
-        loader.save_session_to_file()
-
-    def _load_owners(self, cap: Optional[int]) -> List[CommentOwner]:
-        from instaloader import Post
-        from instaloader.exceptions import (
-            PrivateProfileNotFollowedException,
-            QueryReturnedNotFoundException,
-            TooManyRequestsException,
-        )
-
-        loader = self._ensure_loader()
-        try:
-            post = Post.from_shortcode(loader.context, self._shortcode)
-            return self._collect_owners(post.get_comments(), cap)
-        except (PrivateProfileNotFollowedException, QueryReturnedNotFoundException) as exc:
+            comments = client.media_comments(media_pk, amount=0)  # amount=0 -> all
+        except MediaNotFound as exc:
             raise PostUnavailableError(
                 f"Post {self._shortcode} is private, deleted, or unavailable."
             ) from exc
-        except TooManyRequestsException:
-            logger.warning("Rate limited (429) while reading comments for %s", self._shortcode)
-            raise
 
-    def _download_avatar(self, owner: CommentOwner, dest: Path) -> None:
+        owners: List[Owner] = []
+        for comment in comments:
+            user = comment.user
+            try:
+                userid = int(user.pk)  # numeric -> unique ids + safe filenames
+            except (TypeError, ValueError):
+                # One malformed commenter must not sink the whole race.
+                logger.warning("Skipping commenter with non-numeric id: %r", getattr(user, "pk", None))
+                continue
+            owners.append(
+                Owner(userid=userid, username=user.username, profile_pic_url=str(user.profile_pic_url))
+            )
+        return self._dedupe(owners, cap)
+
+    def _download_avatar(self, owner: Owner, dest: Path) -> None:
         """Fetch the avatar bytes into our own flat cache (predictable filenames).
 
         Only fetches from Instagram's CDN over HTTPS, and only caches a body that
-        actually looks like an image - so an empty/HTML error body (e.g. a soft
-        rate-limit page) is never cached as a `.jpg` that would then be served
-        forever by the dest.exists() short-circuit.
+        actually looks like an image - so an empty/HTML error body is never cached
+        as a `.jpg` that would then be served forever by the dest.exists() check.
         """
+        import requests
+
         url = owner.profile_pic_url
         parsed = urlparse(url)
         host = parsed.hostname or ""
@@ -265,7 +216,12 @@ class PostCommentersSource:
         if parsed.scheme != "https" or not allowed_host:
             raise ValueError(f"Refusing to fetch avatar from untrusted URL: {url!r}")
 
-        content = self._ensure_loader().context.get_raw(url).content
+        # allow_redirects=False: the host allowlist only vets the initial URL, so
+        # following a redirect could reach an internal/untrusted host (SSRF). Instagram
+        # avatar CDN URLs are served directly, so refusing redirects costs nothing here.
+        response = requests.get(url, timeout=30, allow_redirects=False)
+        response.raise_for_status()
+        content = response.content
         if not content or not content.startswith(_IMAGE_MAGIC):
             raise ValueError("Avatar response was empty or not a JPEG/PNG image")
         dest.write_bytes(content)

@@ -5,7 +5,10 @@ requires-python = ">=3.9"
 dependencies = [
     "pymunk>=6.6",
     "Pillow>=10.0",
-    "instaloader>=4.13",
+    # instagrapi (private mobile-API client) is what actually works against current
+    # Instagram for comment fetching; instaloader's endpoints are blocked. `requests`
+    # comes in transitively and is used directly for avatar downloads.
+    "instagrapi>=2.0",
 ]
 
 [project.optional-dependencies]

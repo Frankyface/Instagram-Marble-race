@@ -1,49 +1,65 @@
-"""Tests for PostCommentersSource. No live Instagram access - all network/instaloader
-touchpoints are patched, injected, or pre-seeded, so the suite runs without instaloader
-installed."""
-import sys
+"""Tests for PostCommentersSource (instagrapi-based). No live Instagram access -
+the client is injected as a fake and requests.get is monkeypatched, so the suite
+never touches the network."""
 import types
-from dataclasses import dataclass, field
 
 import pytest
 
 from sources.post_commenters import (
+    Owner,
     PostCommentersSource,
     PostUnavailableError,
     extract_shortcode,
 )
 
-
 _JPEG = b"\xff\xd8\xff" + b"fake-jpeg-body"
-
-
-@dataclass
-class FakeOwner:
-    userid: object
-    username: str
-    profile_pic_url: str = "https://scontent.cdninstagram.com/pic.jpg"
-
-
-@dataclass
-class FakeReply:
-    owner: FakeOwner
-
-
-@dataclass
-class FakeComment:
-    owner: FakeOwner
-    answers: list = field(default_factory=list)
 
 
 def _source(tmp_path, **kwargs):
     kwargs.setdefault("cache_dir", tmp_path)
-    kwargs.setdefault("ig_username", "tester")
+    kwargs.setdefault("sessionid", "fake-session")
     return PostCommentersSource("https://www.instagram.com/p/DaGvb2blZts/", **kwargs)
 
 
 def _seed_avatars(tmp_path, *userids):
     for uid in userids:
-        (tmp_path / f"{uid}.jpg").write_bytes(b"fake-avatar")
+        (tmp_path / f"{uid}.jpg").write_bytes(_JPEG)
+
+
+# ---- instagrapi comment/user fakes ------------------------------------------
+
+
+class FakeUser:
+    def __init__(self, pk, username, pic="https://scontent.cdninstagram.com/x.jpg"):
+        self.pk = pk
+        self.username = username
+        self.profile_pic_url = pic
+
+
+class FakeComment:
+    def __init__(self, user):
+        self.user = user
+
+
+class FakeClient:
+    def __init__(self, comments=(), media_pk=123, raise_on_comments=None, raise_on_pk=None):
+        self._comments = list(comments)
+        self._media_pk = media_pk
+        self._raise = raise_on_comments
+        self._raise_pk = raise_on_pk
+        self.calls = []
+
+    def media_pk_from_url(self, url):
+        self.calls.append(("pk", url))
+        if self._raise_pk is not None:
+            raise self._raise_pk
+        return self._media_pk
+
+    def media_comments(self, media_pk, amount=0):
+        self.calls.append(("comments", media_pk, amount))
+        if self._raise is not None:
+            raise self._raise
+        return self._comments
 
 
 # ---- extract_shortcode ------------------------------------------------------
@@ -68,61 +84,40 @@ def test_extract_shortcode_rejects_non_post_urls():
     for bad in (
         "",
         "not a url at all!",
-        "https://www.instagram.com/",  # no post path
-        "https://www.instagram.com/p/",  # prefix only, no shortcode
-        "https://www.instagram.com/some_username/",  # profile URL, not a post
+        "https://www.instagram.com/",
+        "https://www.instagram.com/p/",
+        "https://www.instagram.com/some_username/",
     ):
         with pytest.raises(ValueError):
             extract_shortcode(bad)
 
 
-# ---- _collect_owners: dedup / cap / replies ---------------------------------
+# ---- _dedupe: dedup / cap ----------------------------------------------------
 
 
-def test_collect_owners_dedupes_repeat_commenters_preserving_order(tmp_path):
+def test_dedupe_removes_repeat_commenters_preserving_order(tmp_path):
     source = _source(tmp_path)
-    comments = [
-        FakeComment(FakeOwner(1, "alice")),
-        FakeComment(FakeOwner(2, "bob")),
-        FakeComment(FakeOwner(1, "alice")),  # alice again
-    ]
-    owners = source._collect_owners(comments, cap=None)
-    assert [o.userid for o in owners] == [1, 2]
+    owners = [Owner(1, "alice", "u"), Owner(2, "bob", "u"), Owner(1, "alice", "u")]
+    assert [o.userid for o in source._dedupe(owners, cap=None)] == [1, 2]
 
 
-def test_collect_owners_respects_cap(tmp_path):
+def test_dedupe_respects_cap(tmp_path):
     source = _source(tmp_path)
-    comments = [FakeComment(FakeOwner(i, f"u{i}")) for i in range(5)]
-    owners = source._collect_owners(comments, cap=3)
-    assert len(owners) == 3
+    owners = [Owner(i, f"u{i}", "u") for i in range(5)]
+    assert len(source._dedupe(owners, cap=3)) == 3
 
 
-def test_collect_owners_returns_empty_for_zero_cap(tmp_path):
+def test_dedupe_returns_empty_for_zero_cap(tmp_path):
     source = _source(tmp_path)
-    comments = [FakeComment(FakeOwner(1, "alice")), FakeComment(FakeOwner(2, "bob"))]
-    assert source._collect_owners(comments, cap=0) == []
+    assert source._dedupe([Owner(1, "a", "u"), Owner(2, "b", "u")], cap=0) == []
 
 
 def test_effective_cap_takes_the_smaller_of_limit_and_max(tmp_path):
     source = _source(tmp_path, max_commenters=2)
-    assert source._effective_cap(5) == 2  # max_commenters wins
-    assert source._effective_cap(1) == 1  # limit wins
-    assert source._effective_cap(None) == 2  # only max_commenters set
-    assert _source(tmp_path, max_commenters=None)._effective_cap(None) is None
-
-
-def test_collect_owners_excludes_reply_authors_by_default(tmp_path):
-    source = _source(tmp_path)
-    comments = [FakeComment(FakeOwner(1, "alice"), answers=[FakeReply(FakeOwner(3, "carol"))])]
-    owners = source._collect_owners(comments, cap=None)
-    assert [o.userid for o in owners] == [1]
-
-
-def test_collect_owners_includes_reply_authors_when_enabled(tmp_path):
-    source = _source(tmp_path, include_replies=True)
-    comments = [FakeComment(FakeOwner(1, "alice"), answers=[FakeReply(FakeOwner(3, "carol"))])]
-    owners = source._collect_owners(comments, cap=None)
-    assert [o.userid for o in owners] == [1, 3]
+    assert source._effective_cap(5) == 2
+    assert source._effective_cap(1) == 1
+    assert source._effective_cap(None) == 2
+    assert _source(tmp_path)._effective_cap(None) is None
 
 
 # ---- _build_racers: base + extras + skip ------------------------------------
@@ -131,285 +126,127 @@ def test_collect_owners_includes_reply_authors_when_enabled(tmp_path):
 def test_build_racers_one_marble_per_owner(tmp_path):
     _seed_avatars(tmp_path, 1, 2)
     source = _source(tmp_path)
-    racers = source._build_racers([FakeOwner(1, "alice"), FakeOwner(2, "bob")])
+    racers = source._build_racers([Owner(1, "alice", "u"), Owner(2, "bob", "u")])
     assert [r.id for r in racers] == ["ig-1", "ig-2"]
     assert [r.username for r in racers] == ["alice", "bob"]
-    assert all(r.avatar_path.endswith(".jpg") for r in racers)
 
 
 def test_build_racers_adds_extra_entries_with_unique_ids(tmp_path):
     _seed_avatars(tmp_path, 1)
     source = _source(tmp_path, extra_entries={"Alice": 2})  # case-insensitive
-    racers = source._build_racers([FakeOwner(1, "alice")])
-    # 1 base + 2 extras = 3 marbles for alice
+    racers = source._build_racers([Owner(1, "alice", "u")])
     assert [r.id for r in racers] == ["ig-1", "ig-1-x2", "ig-1-x3"]
     assert {r.username for r in racers} == {"alice"}
-    assert len({r.id for r in racers}) == 3  # ids are unique
-    assert len({r.avatar_path for r in racers}) == 1  # same face
+    assert len({r.id for r in racers}) == 3
+    assert len({r.avatar_path for r in racers}) == 1
 
 
 def test_build_racers_skips_commenter_with_no_downloadable_avatar(tmp_path):
-    _seed_avatars(tmp_path, 1)  # only alice has an avatar on disk
+    _seed_avatars(tmp_path, 1)
 
-    def _fail_download(owner, dest):
+    def _fail(owner, dest):
         raise OSError("no avatar")
 
     source = _source(tmp_path)
-    source._download_avatar = _fail_download  # bob's download will fail
-    racers = source._build_racers([FakeOwner(1, "alice"), FakeOwner(2, "bob")])
+    source._download_avatar = _fail  # bob's download fails
+    racers = source._build_racers([Owner(1, "alice", "u"), Owner(2, "bob", "u")])
     assert [r.id for r in racers] == ["ig-1"]
 
 
-def test_build_racers_skips_commenter_with_non_numeric_userid(tmp_path):
-    _seed_avatars(tmp_path, 1)
+# ---- _download_avatar guards -------------------------------------------------
+
+
+def test_download_avatar_writes_bytes_to_cache(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return types.SimpleNamespace(content=_JPEG, raise_for_status=lambda: None)
+
+    monkeypatch.setattr("requests.get", fake_get)
     source = _source(tmp_path)
-    racers = source._build_racers([FakeOwner("1-x2", "eve"), FakeOwner(1, "alice")])
-    assert [r.id for r in racers] == ["ig-1"]  # the string-id owner is dropped
+    dest = tmp_path / "42.jpg"
+    source._download_avatar(Owner(42, "dan", "https://scontent.cdninstagram.com/42.jpg"), dest)
+    assert dest.read_bytes() == _JPEG
+    assert calls == ["https://scontent.cdninstagram.com/42.jpg"]
 
 
-# ---- fetch orchestration ----------------------------------------------------
+def test_download_avatar_refuses_untrusted_host(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setattr("requests.get", lambda *a, **k: called.append(1))
+    source = _source(tmp_path)
+    with pytest.raises(ValueError):
+        source._download_avatar(Owner(42, "dan", "https://evil.example.com/42.jpg"), tmp_path / "x")
+    assert called == []  # never fetched
 
 
-def test_fetch_requires_a_username(tmp_path, monkeypatch):
-    monkeypatch.delenv("IG_USERNAME", raising=False)
+def test_download_avatar_rejects_non_image_body(tmp_path, monkeypatch):
+    def fake_get(url, **kwargs):
+        return types.SimpleNamespace(content=b"<html>rate limited</html>", raise_for_status=lambda: None)
+
+    monkeypatch.setattr("requests.get", fake_get)
+    source = _source(tmp_path)
+    dest = tmp_path / "42.jpg"
+    with pytest.raises(ValueError):
+        source._download_avatar(Owner(42, "dan", "https://scontent.cdninstagram.com/42.jpg"), dest)
+    assert not dest.exists()
+
+
+# ---- _load_owners + fetch (fake client) -------------------------------------
+
+
+def test_load_owners_dedupes_from_client_comments(tmp_path):
+    client = FakeClient(
+        comments=[
+            FakeComment(FakeUser(1, "alice")),
+            FakeComment(FakeUser(1, "alice")),
+            FakeComment(FakeUser(2, "bob")),
+        ]
+    )
+    source = _source(tmp_path, client=client)
+    owners = source._load_owners(client, cap=None)
+    assert [o.userid for o in owners] == [1, 2]
+    assert ("comments", 123, 0) in client.calls  # amount=0 -> all
+
+
+def test_load_owners_translates_media_not_found_to_post_unavailable(tmp_path):
+    from instagrapi.exceptions import MediaNotFound
+
+    client = FakeClient(raise_on_comments=MediaNotFound(media_pk=123))
+    source = _source(tmp_path, client=client)
+    with pytest.raises(PostUnavailableError):
+        source._load_owners(client, cap=None)
+
+
+def test_load_owners_unresolvable_url_raises_post_unavailable(tmp_path):
+    client = FakeClient(raise_on_pk=ValueError("bad url"))
+    source = _source(tmp_path, client=client)
+    with pytest.raises(PostUnavailableError):
+        source._load_owners(client, cap=None)
+
+
+def test_load_owners_skips_commenter_with_non_numeric_pk(tmp_path):
+    client = FakeClient(
+        comments=[FakeComment(FakeUser("not-a-number", "weird")), FakeComment(FakeUser(2, "bob"))]
+    )
+    source = _source(tmp_path, client=client)
+    owners = source._load_owners(client, cap=None)
+    assert [o.userid for o in owners] == [2]  # the bad-pk commenter is dropped, not fatal
+
+
+def test_fetch_requires_a_session(tmp_path, monkeypatch):
+    monkeypatch.delenv("IG_SESSIONID", raising=False)
     source = PostCommentersSource(
-        "https://www.instagram.com/p/DaGvb2blZts/", cache_dir=tmp_path, ig_username=None
+        "https://www.instagram.com/p/DaGvb2blZts/", cache_dir=tmp_path, sessionid=None
     )
     with pytest.raises(ValueError):
         source.fetch()
 
 
-def test_fetch_raises_post_unavailable_when_load_fails(tmp_path):
-    _seed_avatars(tmp_path, 1)
-    source = _source(tmp_path)
-    source._ensure_loader = lambda: object()
-    source._ensure_login = lambda: None
-
-    def _boom(cap):
-        raise PostUnavailableError("gone")
-
-    source._load_owners = _boom
-    with pytest.raises(PostUnavailableError):
-        source.fetch()
-
-
-def test_fetch_wires_load_and_build_together(tmp_path):
-    _seed_avatars(tmp_path, 1, 2)
-    source = _source(tmp_path, max_commenters=None)
-    source._ensure_loader = lambda: object()
-    source._ensure_login = lambda: None
-    source._load_owners = lambda cap: [FakeOwner(1, "alice"), FakeOwner(2, "bob")]
+def test_fetch_end_to_end_with_fake_client(tmp_path):
+    _seed_avatars(tmp_path, 1, 2)  # avatars already cached -> no download
+    client = FakeClient(comments=[FakeComment(FakeUser(1, "alice")), FakeComment(FakeUser(2, "bob"))])
+    source = _source(tmp_path, client=client)
     racers = source.fetch()
     assert [r.id for r in racers] == ["ig-1", "ig-2"]
-
-
-def test_fetch_passes_effective_cap_from_limit(tmp_path):
-    _seed_avatars(tmp_path, 1, 2, 3)
-    captured = {}
-    source = _source(tmp_path, max_commenters=None)
-    source._ensure_loader = lambda: object()
-    source._ensure_login = lambda: None
-
-    def _capture(cap):
-        captured["cap"] = cap
-        return [FakeOwner(i, f"u{i}") for i in range(1, 4)]
-
-    source._load_owners = _capture
-    source.fetch(limit=2)
-    assert captured["cap"] == 2
-
-
-# ---- network/instaloader methods (fake instaloader injected via sys.modules) --
-
-
-class _FakeContext:
-    def __init__(self, content=_JPEG):
-        self.fetched_urls = []
-        self._content = content
-
-    def get_raw(self, url):
-        self.fetched_urls.append(url)
-        return types.SimpleNamespace(content=self._content)
-
-
-class _FakeLoader:
-    def __init__(self):
-        self.context = _FakeContext()
-        self.calls = []
-        self.session_exists = False
-        self.login_raises = None
-
-    def load_session_from_file(self, username):
-        self.calls.append(("load_session", username))
-        if not self.session_exists:
-            raise FileNotFoundError
-
-    def login(self, user, password):
-        self.calls.append(("login", user))
-        if self.login_raises is not None:
-            raise self.login_raises
-
-    def two_factor_login(self, code):
-        self.calls.append(("two_factor_login", code))
-
-    def save_session_to_file(self):
-        self.calls.append(("save_session",))
-
-
-@pytest.fixture
-def fake_instaloader(monkeypatch):
-    """Install a fake `instaloader` package into sys.modules so the lazy imports
-    inside the network methods resolve without the real dependency."""
-    exc = types.ModuleType("instaloader.exceptions")
-
-    class TwoFactorAuthRequiredException(Exception):
-        pass
-
-    class PrivateProfileNotFollowedException(Exception):
-        pass
-
-    class QueryReturnedNotFoundException(Exception):
-        pass
-
-    class TooManyRequestsException(Exception):
-        pass
-
-    exc.TwoFactorAuthRequiredException = TwoFactorAuthRequiredException
-    exc.PrivateProfileNotFollowedException = PrivateProfileNotFollowedException
-    exc.QueryReturnedNotFoundException = QueryReturnedNotFoundException
-    exc.TooManyRequestsException = TooManyRequestsException
-
-    ig = types.ModuleType("instaloader")
-    ig.exceptions = exc
-    ig.Instaloader = lambda quiet=False: _FakeLoader()
-
-    # Post.from_shortcode(context, shortcode) -> post whose get_comments() is set per test
-    comments_holder = {"comments": [], "raise": None}
-
-    class FakePost:
-        @classmethod
-        def from_shortcode(cls, context, shortcode):
-            return cls()
-
-        def get_comments(self):
-            if comments_holder["raise"] is not None:
-                raise comments_holder["raise"]
-            return comments_holder["comments"]
-
-    ig.Post = FakePost
-
-    monkeypatch.setitem(sys.modules, "instaloader", ig)
-    monkeypatch.setitem(sys.modules, "instaloader.exceptions", exc)
-    return types.SimpleNamespace(module=ig, exceptions=exc, comments_holder=comments_holder)
-
-
-def test_ensure_loader_creates_instaloader_when_none(tmp_path, fake_instaloader):
-    source = PostCommentersSource(
-        "https://www.instagram.com/p/DaGvb2blZts/", cache_dir=tmp_path, ig_username="tester"
-    )
-    loader = source._ensure_loader()
-    assert isinstance(loader, _FakeLoader)
-
-
-def test_ensure_login_reuses_existing_session(tmp_path, fake_instaloader):
-    source = _source(tmp_path)
-    loader = _FakeLoader()
-    loader.session_exists = True
-    source._loader = loader
-    source._ensure_login()
-    assert loader.calls == [("load_session", "tester")]  # no login attempt
-
-
-def test_ensure_login_logs_in_and_saves_when_no_session(tmp_path, fake_instaloader, monkeypatch):
-    monkeypatch.setenv("IG_PASSWORD", "hunter2")
-    source = _source(tmp_path)
-    loader = _FakeLoader()  # session_exists=False -> load raises FileNotFoundError
-    source._loader = loader
-    source._ensure_login()
-    assert ("login", "tester") in loader.calls
-    assert ("save_session",) in loader.calls
-
-
-def test_ensure_login_raises_without_password(tmp_path, fake_instaloader, monkeypatch):
-    monkeypatch.delenv("IG_PASSWORD", raising=False)
-    source = _source(tmp_path)
-    source._loader = _FakeLoader()
-    with pytest.raises(ValueError):
-        source._ensure_login()
-
-
-def test_ensure_login_handles_two_factor(tmp_path, fake_instaloader, monkeypatch):
-    monkeypatch.setenv("IG_PASSWORD", "hunter2")
-    monkeypatch.setenv("IG_2FA_CODE", "123456")
-    source = _source(tmp_path)
-    loader = _FakeLoader()
-    loader.login_raises = fake_instaloader.exceptions.TwoFactorAuthRequiredException()
-    source._loader = loader
-    source._ensure_login()
-    assert ("two_factor_login", "123456") in loader.calls
-    assert ("save_session",) in loader.calls  # session persisted after 2FA too
-
-
-def test_load_owners_returns_deduped_owners(tmp_path, fake_instaloader):
-    fake_instaloader.comments_holder["comments"] = [
-        FakeComment(FakeOwner(1, "alice")),
-        FakeComment(FakeOwner(1, "alice")),
-        FakeComment(FakeOwner(2, "bob")),
-    ]
-    source = _source(tmp_path)
-    source._loader = _FakeLoader()
-    owners = source._load_owners(cap=None)
-    assert [o.userid for o in owners] == [1, 2]
-
-
-def test_load_owners_translates_private_post_to_post_unavailable(tmp_path, fake_instaloader):
-    fake_instaloader.comments_holder["raise"] = (
-        fake_instaloader.exceptions.PrivateProfileNotFollowedException()
-    )
-    source = _source(tmp_path)
-    source._loader = _FakeLoader()
-    with pytest.raises(PostUnavailableError):
-        source._load_owners(cap=None)
-
-
-def test_load_owners_propagates_rate_limit(tmp_path, fake_instaloader):
-    fake_instaloader.comments_holder["raise"] = (
-        fake_instaloader.exceptions.TooManyRequestsException()
-    )
-    source = _source(tmp_path)
-    source._loader = _FakeLoader()
-    with pytest.raises(fake_instaloader.exceptions.TooManyRequestsException):
-        source._load_owners(cap=None)
-
-
-def test_download_avatar_writes_bytes_to_cache(tmp_path, fake_instaloader):
-    source = _source(tmp_path)
-    loader = _FakeLoader()
-    source._loader = loader
-    owner = FakeOwner(42, "dan", "https://scontent.cdninstagram.com/42.jpg")
-    dest = tmp_path / "42.jpg"
-    source._download_avatar(owner, dest)
-    assert dest.read_bytes() == _JPEG
-    assert loader.context.fetched_urls == ["https://scontent.cdninstagram.com/42.jpg"]
-
-
-def test_download_avatar_refuses_untrusted_host(tmp_path, fake_instaloader):
-    source = _source(tmp_path)
-    source._loader = _FakeLoader()
-    owner = FakeOwner(42, "dan", "https://evil.example.com/42.jpg")
-    with pytest.raises(ValueError):
-        source._download_avatar(owner, tmp_path / "42.jpg")
-    # nothing fetched, nothing written
-    assert source._loader.context.fetched_urls == []
-    assert not (tmp_path / "42.jpg").exists()
-
-
-def test_download_avatar_rejects_non_image_body(tmp_path, fake_instaloader):
-    source = _source(tmp_path)
-    loader = _FakeLoader()
-    loader.context = _FakeContext(content=b"<html>rate limited</html>")
-    source._loader = loader
-    owner = FakeOwner(42, "dan", "https://scontent.cdninstagram.com/42.jpg")
-    with pytest.raises(ValueError):
-        source._download_avatar(owner, tmp_path / "42.jpg")
-    assert not (tmp_path / "42.jpg").exists()  # poison body not cached
+    assert [r.username for r in racers] == ["alice", "bob"]

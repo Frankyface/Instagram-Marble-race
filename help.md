@@ -10,16 +10,12 @@ _Things only I (the human) can do. Check off as completed._
 - [ ] **Pick/source a real royalty-free looping background music track** for the video's audio bed — e.g. YouTube Audio Library, Pixabay Music, or a licensed source. Confirm it's safe to use on a video posted to Instagram. A silent placeholder (`renderer/public/audio/background.wav`, generated locally) stands in for now; once you have a real track, replace that file (keep the `.wav` extension, or update the `src` field in `renderer/src/audio.ts`'s `backgroundMusic` subscriber if using a different format like `.mp3`) — no other code changes needed.
 
 ## Blocks Stage 3 (Real Data Sources)
-- [ ] **Commenters path (instaloader — BUILT, needs creds to run live)**: The `PostCommentersSource` adapter is built and unit-tested. To actually run it against a real post, you need to:
-  1. `cd engine && .venv/Scripts/python.exe -m pip install instaloader` (declared in `pyproject.toml`; not yet installed — I can run this for you when you're ready).
-  2. Decide which Instagram account logs in — **strongly recommend a secondary/burner account**, not your primary, because of the (real but undocumented) account-ban risk of unofficial scraping. Comment retrieval and HD avatars both require login.
-  3. Put its creds in a local `.env` (already gitignored, never committed):
-     ```
-     IG_USERNAME=your_burner_handle
-     IG_PASSWORD=your_burner_password
-     # IG_2FA_CODE=123456   # only if the account has 2FA, and only for the first login
-     ```
-     After the first successful login, instaloader saves a session file and reuses it — you won't need the password on later runs.
+- [x] **Commenters path (instagrapi — WORKING, live-verified)**: `PostCommentersSource` is built, tested, and has produced a real video (73 real commenters). Uses `instagrapi` (not instaloader — its endpoints are blocked by Instagram). Auth is via a **browser sessionid** in `.env`:
+  ```
+  IG_SESSIONID=<the sessionid cookie value from a logged-in Instagram browser tab>
+  ```
+  **How to refresh the sessionid when it expires** (they don't last forever): in a Chrome/Firefox tab logged into Instagram, F12 → Application → Cookies → instagram.com → copy the `sessionid` value → paste it into `engine/.env`. That's the only maintenance this path needs. (A username/password `login()` was tried and got throttled — the browser session is the reliable path.) Recommend keeping this on a burner account given the ToS/ban risk.
+  - To run: `cd engine && .venv/Scripts/python.exe scripts/run_commenter_race.py "<post_url>"`, then `cd ../renderer && node scripts/render.mjs --manifest ../engine/output/commenter_race.json --out output/commenter_race.mp4`.
 - [ ] **Official export path**: Go to Instagram → Settings → "Download Your Information," request a JSON export of your account data (includes your followers list). This can take a few hours to a day for Instagram to generate — request it early since the official-export adapter needs a real export to build against.
 - [ ] **instagrapi path**: Decide which Instagram account you're willing to use for the unofficial *follower* scraper (same ban/flag considerations as the burner above). Creds go in the same local `.env`.
 

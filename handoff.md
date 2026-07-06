@@ -1,16 +1,20 @@
 # Handoff — Followers Marble Race
-_Last updated: 2026-07-06 · Current stage: Stage 3 — Real Data Sources (first adapter built)_
+_Last updated: 2026-07-06 · Current stage: Stage 3 — Real Data Sources (commenters adapter WORKING, live-verified)_
 
 ## 🎯 Goals
-Stages 1 (engine) and 2 (renderer) are built and verified — a real 30-racer manifest renders end-to-end into a shareable vertical MP4. Stage 3 (real Instagram data) is now underway: the first adapter — `PostCommentersSource` (races a post's commenters via `instaloader`) — is built and unit-tested. Next: a live run once the user supplies burner-account creds, then the official-export and instagrapi follower adapters.
+Stages 1 (engine) and 2 (renderer) are built and verified. Stage 3 (real Instagram data) has its first adapter working **end-to-end live**: `PostCommentersSource` races a post's commenters. A real run produced the project's first fully-real video (73 real commenters). Next: the official Meta-export and instagrapi *follower* adapters (the two other planned Stage 3 sources).
 
-## 🆕 Most recent work (Stage 3 — commenters adapter)
-At the user's request, added a `FollowerSource` that races the **commenters of one post** (not followers), using `instaloader`. Ran a feasibility research workflow first (12 agents, verified against the real instaloader docs — all core mechanics confirmed; login mandatory; 429 rate-limiting certain; account-ban risk real-but-undocumented). Then built:
-- `engine/sources/post_commenters.py` — `PostCommentersSource` + `extract_shortcode()` + `PostUnavailableError`. Constructor takes a post URL (mirrors `LocalFolderSource`'s "source carries its target" pattern — zero interface change). `instaloader` imported lazily so the module + test suite work without it installed.
-- Per the user's two adjustments: **no cap** by default (include all ~90 commenters), and an **`extra_entries`** option to add bonus marbles for a specific commenter (same face/name, unique marble ids like `ig-<userid>-x2`).
-- `engine/tests/test_post_commenters.py` — 24 tests, 97% module coverage, fake `instaloader` injected via `sys.modules` so nothing hits the live API.
-- Docs: `staging/stage-3-data-sources/feature-commenters-adapter.md`, updated stage-3 `overview.md`, `help.md` (burner creds + `.env` vars + `pip install instaloader`).
-- **Blocked on the user for a live run**: `pip install instaloader` + burner Instagram creds in `.env` (`IG_USERNAME`/`IG_PASSWORD`/optional `IG_2FA_CODE`). Also still no CLI that goes URL → simulate → render in one shot (natural next step once creds exist).
+## 🆕 Most recent work (Stage 3 — commenters adapter, live-verified)
+Added a `FollowerSource` that races the **commenters of one post** (not followers). The journey and final state:
+- Ran a feasibility research workflow (12 agents) first, then built the adapter on **`instaloader`** per the docs.
+- **Live run revealed instaloader is blocked by current Instagram**: its comment/metadata endpoints return `"execution error"` / generic `"fail"` even with a valid session (own-profile reads worked, so not auth/rate-limit). Diagnosed thoroughly (web GraphQL doc_id query + mobile fallback both rejected).
+- **Switched the adapter to `instagrapi`** (the project's other planned library), whose fuller mobile-app emulation works. Rewrote `engine/sources/post_commenters.py` around it. Pure logic (extract_shortcode, dedupe, build_racers, extra_entries, avatar host/image guards) preserved; network methods now use instagrapi + `requests`.
+- **Auth is via a browser `sessionid`** (`IG_SESSIONID` in gitignored `.env`), not username/password — a fresh `login()` got throttled (`401 "please wait a few minutes"`); the browser session carries the trust tokens that get through. (browser_cookie3 auto-import failed on Chrome's app-bound encryption, so the user copied the sessionid manually from DevTools.)
+- Per the user's two adjustments: **no cap** by default (the real run pulled 73), and **`extra_entries`** to add bonus marbles for a specific commenter (unique ids like `ig-<userid>-x2`).
+- `engine/scripts/run_commenter_race.py` — CLI: post URL → fetch commenters+avatars → simulate → manifest. Then the existing renderer produces the MP4.
+- **Live result**: 73 real commenters fetched, avatars downloaded, raced, rendered to `renderer/output/commenter_race.mp4` (1080×1920, 65s, real faces + full ranked podium). Winner `@casswalden`.
+- `engine/tests/test_post_commenters.py` — 18 tests, 95% coverage, fake instagrapi client + monkeypatched `requests.get` (no live API in tests). Full engine suite 45 tests / 97%.
+- Deps: `pyproject.toml` now declares `instagrapi` (dropped `instaloader`). `.env` uses `IG_SESSIONID`.
 
 ## 📍 Current State
 **Python engine** (`engine/`, own venv):
@@ -44,8 +48,8 @@ At the user's request, added a `FollowerSource` that races the **commenters of o
 - Stage 2: `zod` installed at its latest (4.4.3) initially — Remotion 4.0.485 requires exactly 4.3.6 and warns loudly about version mismatches. Pinned to the exact required version.
 
 ## ➡️ Next Up
-1. **Live-test the commenters adapter** once the user provides burner creds + installs instaloader (see `help.md`). Then build a small CLI/flag that goes post URL → `PostCommentersSource.fetch()` → `run_race()` → render, so a real commenter race can be produced end-to-end.
-2. Build the other two Stage 3 adapters: official Meta export parser + instagrapi follower scraper.
+1. Commenters adapter is done + live-verified. Refresh `IG_SESSIONID` when it expires (see `help.md`).
+2. Build the other two Stage 3 adapters: official Meta export parser + instagrapi *follower* scraper (both can reuse the instagrapi client pattern now proven here).
 3. Still needed from the user: a real royalty-free background music track (current one is a silent placeholder) — swap-in point is `renderer/src/audio.ts`'s `backgroundMusic` subscriber, no restructuring needed.
 4. When Stage 4 (Elimination) starts: budget real design time for `physics.py`'s loop restructuring and the finish-handling body-lifecycle change — see `feature-race-engine.md`'s corrected "Extension hook points" note.
 5. When real event-timed SFX are added (Stage 4+): `AudioCue` needs a per-cue timing field and `RaceComposition` needs per-cue `<Sequence>` wrapping — see the corrected note in `feature-audio-layer.md`.
