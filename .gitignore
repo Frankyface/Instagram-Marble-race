@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+
+# Node / Remotion
+node_modules/
+dist/
+out/
+.env
+.env.local
+
+# Race data / outputs (local artifacts, not source)
+*.mp4
+race-manifests/
+avatars-cache/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
