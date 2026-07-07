@@ -1,10 +1,31 @@
 # Handoff — Followers Marble Race
-_Last updated: 2026-07-06 · Current stage: Stage 3 — Real Data Sources (commenters adapter WORKING, live-verified)_
+_Last updated: 2026-07-07 · Current stage: Stage 6 — Web App + Level Editor (PIVOTED to coloured-balls; **S0–S6 BUILT + VERIFIED** — working app: editor + live preview + MP4 export. S7–S10 remain.)_
+
+## 🏗️ Build status (2026-07-07) — S0–S6 done, verified in-browser
+The coloured-balls web app is **built and working** in `web/` (branch `stage-6/web-app`, uncommitted). Verified via `vitest` (21 tests) + `npm run build` + live browser preview (python http.server on `web/dist`, screenshots).
+- **S0** ✅ Vite 8 + React 19 + TS scaffold; GitHub Pages Actions workflow (`.github/workflows/deploy-pages.yml`); relative `base:"./"` (repo-name-agnostic). Build clean, renders in browser. NOT yet pushed/deployed (awaiting user go).
+- **S1** ✅ Level format ported + Zod schema (`web/src/level/schema.ts`); validates `classic-funnel.json`, round-trips, rejects bad input. 8 tests.
+- **S2** ✅ Deterministic Rapier core (`web/src/race/engine.ts`, `@dimforge/rapier2d-compat`); fixed 1/60 dt, mulberry32 seed. Tests: bit-identical two-run determinism, seed sensitivity, 16/16 + 48/48 finish. `cameraTargetY` (monotonic) in the frame.
+- **S3** ✅ Shared `render()` (`web/src/render/render.ts`) + camera (`camera.ts`); resolution-parameterized (scale test passes) + camera-follows-leader.
+- **S4** ✅ Live preview (`web/src/app/raceController.ts` rAF fixed-timestep + `RacePreview.tsx`); ball-count 2–64 (default 16); OKLCH golden-ratio colours (`render/colors.ts`, culori). Verified: 16 & 40 balls race live, distinct colours.
+- **S5** ✅ Client-side MP4 export (`web/src/export/exportMp4.ts`, WebCodecs + Mediabunny). Verified in-browser: real 1080×1920 H.264 MP4, dur = frames/60 (frame-identical to preview), ~1.9s encode for a 4s video, 2.8 MB download. Dry-run gate (`probeMp4Support`) works. NO SharedArrayBuffer needed.
+- **S6** ✅ react-konva editor (`web/src/editor/Editor.tsx` + `model.ts`); palette (peg / peg-row / funnel / wall), drag-move, delete, pan (wheel), Test Race (compile→Zod→race), Save/Load JSON. Verified: added a peg row → Test Race → raced the edited level (frame count changed). Model: 5 tests.
+- Bundle ≈ 2.5 MB / 869 kB gzip (Rapier base64 wasm ~730 kB gzip + Konva). Code-splitting deferred to S8.
+
+**Known minor items / deferred:** Rapier `World` ctor logs a harmless "deprecated parameters" console warning. Editor re-seeds from the current level on each open (no undo/redo or autosave yet — S6b/S6c). Bundle not code-split. `web/README.md` still describes the OLD (pre-build) plan.
+
 
 ## 🎯 Goals
-Stages 1 (engine) and 2 (renderer) are built and verified. Stage 3 (real Instagram data) has its first adapter working **end-to-end live**: `PostCommentersSource` races a post's commenters. A real run produced the project's first fully-real video (73 real commenters). Next: the official Meta-export and instagrapi *follower* adapters (the two other planned Stage 3 sources).
+**PIVOTED (2026-07-07).** Ship ONE static browser web app: a visual **track/level editor** + **live race preview** + **client-side MP4 export**, where the racers are N plain **distinctly-coloured balls** (default 16, adjustable 2–64, no names/avatars). Hosted on **GitHub Pages** (static only — no server). Full scope includes **elimination + brackets**, **camera-follows-leader** scroll, **silent** v1. Built in the existing repo's `web/`. The old Instagram-avatar concept and its Python/Remotion pipeline are **retired** (kept only as reference). Stages 1–3 (Python engine, Remotion renderer, commenters adapter) are historical context below.
 
-## 🆕 Most recent work (Stage 3 — commenters adapter, live-verified)
+## 🆕 Most recent work (2026-07-07 — PROJECT PIVOT to a coloured-balls web app)
+Marbles are no longer Instagram avatars — they are N plain, distinctly-coloured balls (default 16, adjustable 2–64, no identity). The Instagram/`instagrapi` fetch pipeline is **retired entirely** (no server-side anything). Deliverable = ONE static browser web app (editor + live preview + client-side MP4 export) on **GitHub Pages** (static only, no custom headers). User-locked scope: **elimination + brackets**, **camera-follows-leader**, **silent** v1, in the existing repo's `web/`.
+
+A research+design workflow (5 research lenses + synthesis + adversarial critique) **verified the hard constraint**: client-side H.264 MP4 export works on GitHub Pages via **WebCodecs `VideoEncoder` + Mediabunny** — needs only HTTPS, NOT cross-origin isolation/SharedArrayBuffer (so Pages' inability to set COOP/COEP is a non-issue). `ffmpeg.wasm` fast path is blocked on Pages (needs SharedArrayBuffer); single-thread is fallback-only. Locked stack: **Vite + React + TS**, **Rapier2D** (`@dimforge/rapier2d-compat` — deterministic single-thread, base64-inlined wasm; beats planck.js now that pymunk-parity is moot), **hand-written Canvas 2D** with ONE shared `render()` for preview AND export, **react-konva** palette editor, **`culori`** OKLCH auto-distinct ball colours, **Zod** validation, `mulberry32` seeded PRNG.
+
+Critique verdict **SOUND-WITH-FIXES** (all baked into the plan): (1) Firefox `isConfigSupported()` false-positives for H.264 → gate export on a real **one-frame encode dry-run**, not the probe. (2) `VideoFrame.close()` every frame + `encodeQueueSize` backpressure (OOM footgun). (3) `render()` must be **fully resolution-parameterized** (level-units × scale, no pixel literals) or preview ≠ 1080×1920 export. (4) WebM fallback is a **labelled degraded** path, never a silent swap. (5) editor split into 4 sub-stages incl. tall-level **pan/zoom**. Full plan: `staging/stage-6-web-editor-app/overview.md`.
+
+## 🗂️ Earlier work (Stage 3 — commenters adapter, live-verified) — HISTORICAL (pipeline now retired)
 Added a `FollowerSource` that races the **commenters of one post** (not followers). The journey and final state:
 - Ran a feasibility research workflow (12 agents) first, then built the adapter on **`instaloader`** per the docs.
 - **Live run revealed instaloader is blocked by current Instagram**: its comment/metadata endpoints return `"execution error"` / generic `"fail"` even with a valid session (own-profile reads worked, so not auth/rate-limit). Diagnosed thoroughly (web GraphQL doc_id query + mobile fallback both rejected).
@@ -50,23 +71,31 @@ Added a `FollowerSource` that races the **commenters of one post** (not follower
 - Stage 2: assumed `calculateMetadata` could read files via `node:fs` since it "runs in Node" — wrong. Everything in `src/` is webpack-bundled for the browser render context; `node:`-scheme imports aren't handled by webpack's defaults, and even bare `fs`/`path` imports fail to resolve (no Node polyfills configured). Fixed by moving all file I/O into `scripts/render.mjs`, a plain unbundled Node script that passes fully-resolved data into the composition as `inputProps`.
 - Stage 2: `zod` installed at its latest (4.4.3) initially — Remotion 4.0.485 requires exactly 4.3.6 and warns loudly about version mismatches. Pinned to the exact required version.
 
-## ➡️ Next Up — Stage 6 (Web App + Level Editor) is the current focus
-User decisions (2026-07-06): **browser-first (physics ported to JS/planck.js), one cohesive web app (editor + URL→video flow together), personal use (one IG session, no auth).** Planning done; keystone started. This session is very long — continue Stage 6 in a fresh session using `new_session_prompt.md`. Full plan: `staging/stage-6-web-editor-app/overview.md`.
+## ➡️ Next Up — Stage 6 (Coloured-Balls Web App + Level Editor), build starting
+Research + plan locked (SOUND-WITH-FIXES). Full plan + decisions + risks: `staging/stage-6-web-editor-app/overview.md`.
 
-Build order:
-1. Scaffold `web/` as Vite + React + TS; add `planck` (JS physics) + `@remotion/player`. (`web/` today holds only the keystone: `src/level/types.ts` + `levels/classic-funnel.json` + README.)
-2. W2 JS physics (planck.js): Level + N marbles → frame positions + events, same race-manifest shape the Python engine produces. Re-tune fresh in JS; don't chase pymunk parity.
-3. W3 app shell: load a level → run sim → play via Remotion Player in-browser.
-4. W4 canvas level editor (palette pieces → compiled to walls/pegs).
-5. W5 thin local Python `/commenters` API wrapping `engine/sources/post_commenters.py`.
-6. W6 MP4 export — reuse the Node Remotion renderer (`renderer/`).
+Locked stack: Vite + React + TS · Rapier2D (`@dimforge/rapier2d-compat`) · Canvas 2D shared `render()` · WebCodecs + **Mediabunny** MP4 export · **react-konva** editor · `culori` OKLCH ball colours · Zod · `mulberry32` seed.
 
-Hard constraint: the Instagram fetch (instagrapi) and MP4 encoding stay server-side; everything else client-side.
+Build order (each stage independently verifiable):
+- **S0** Static Vite+React+TS scaffold auto-deployed to the live GitHub Pages URL (base = repo subpath, 404.html SPA fallback, Actions `deploy-pages`).
+- **S1** Port the Level format + Zod schema; validate + round-trip `web/levels/classic-funnel.json`.
+- **S2** Deterministic Rapier core (fixed 1/60 dt, `mulberry32` seed) — two runs assert bit-identical positions; all balls finish within a frame cap.
+- **S3** Shared, **resolution-parameterized** `render(ctx,state,frame)` (Canvas 2D) + camera-follows-leader scroll.
+- **S4** Live preview (rAF fixed-timestep accumulator) + ball-count control (default 16, 2–64) + OKLCH auto-distinct colours.
+- **S5** 1080×1920 MP4 export (Mediabunny/WebCodecs) — verified frame-identical to preview; `VideoFrame.close()` + backpressure; Firefox one-frame dry-run gate.
+- **S6a–d** react-konva editor: place/move + tall-level pan/zoom → transform/snap → undo/redo/autosave/import-export → `compileToLevel` (Zod). End-to-end author → Test Race → Export.
+- **S7** Cross-browser hardening + labelled WebM (or single-thread ffmpeg.wasm) fallback; codec dry-run detection.
+- **S8** Perf (64-ball export) + intentional (non-template) UI design pass + QA on the live Pages build.
+- **S9** Elimination mode: gates cut the race into panels (quota passes a gate → panel reset, survivors restart) — sim + editor gate authoring + panel-transition camera/render.
+- **S10** Brackets mode: multiple races, top-X advance across configurable rounds → final; stitched into one exported video.
 
-### Lower priority / carried
-- Refresh `IG_SESSIONID` in `engine/.env` when it expires (`help.md`).
-- Real royalty-free music track (swap `renderer/src/audio.ts`'s `backgroundMusic` src).
-- Stages 4 (elimination) / 5 (brackets) on the Python engine; the other two Stage 3 adapters — none block Stage 6.
+Milestone order: single-race app end-to-end (**S0–S8**) ships first; **S9** (elimination) then **S10** (brackets) layer on the same continuous-race primitive.
+
+### Retired (kept only as reference — do NOT put on the web hot path)
+- Python `pymunk` engine (`engine/`), Node Remotion renderer (`renderer/`), `instagrapi`/FollowerSource fetch, avatar textures, precomputed JSON race-manifest.
+
+### Carried / later
+- Audio (music, then event SFX) is a post-v1 fast-follow — it touches the exporter (adds an AudioEncoder track). Sim should still emit a race-event stream so SFX slot in later.
 
 ## 🔗 Pointer
-→ Current stage folder: `staging/stage-6-web-editor-app/` · Active feature file: `staging/stage-6-web-editor-app/feature-level-format.md` (keystone; `web/src/level/types.ts` implements the draft). Stages 1–2 complete/verified; Stage 3 commenters adapter working + live-verified.
+→ Current stage folder: `staging/stage-6-web-editor-app/` · **S0–S6 built + verified** (see Build status above). Active work: **S7** (cross-browser hardening + labelled WebM/ffmpeg fallback), then **S8** (perf incl. Rapier code-split + design pass + QA), **S9** (elimination/gates), **S10** (brackets). Run `web/`: `npm --prefix web run dev` (or build + serve `web/dist`); tests `npm --prefix web test`. Deploy: push branch→main + enable GitHub Pages (awaiting user authorization). Python engine / Remotion renderer / instagrapi are retired-as-reference.
