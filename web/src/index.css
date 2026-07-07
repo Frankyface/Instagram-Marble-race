@@ -215,3 +215,23 @@ body {
   font-size: 0.85rem;
   margin: 0;
 }
+
+.btn-mini {
+  padding: 0.15rem 0.55rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.gate-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.gate-quota strong {
+  color: #ff8c42;
+  min-width: 1.2rem;
+  text-align: center;
+}

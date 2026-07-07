@@ -38,12 +38,22 @@ export function initPhysics(): Promise<void> {
 
 interface Marble {
   id: number;
-  body: RAPIER.RigidBody | null; // nulled once finished + removed
+  body: RAPIER.RigidBody | null; // nulled once finished/eliminated + removed
   x: number;
   y: number;
   finished: boolean;
   rank: number | null;
   finishFrame: number | null;
+  eliminated: boolean;
+  /** Index of the next elimination gate this marble must still cross. */
+  nextGate: number;
+}
+
+interface GateState {
+  y: number;
+  quota: number;
+  crossed: number;
+  closed: boolean;
 }
 
 export class Race {
@@ -55,8 +65,10 @@ export class Race {
   private marbles: Marble[] = [];
   private frameIndex = 0;
   private finishCount = 0;
+  private eliminatedCount = 0;
   private lastLeaderId: number | null = null;
   private cameraTargetY = 0;
+  private gates: GateState[] = [];
 
   constructor(level: Level, config: RaceConfig, maxFrames: number = DEFAULT_MAX_FRAMES) {
     this.level = level;
@@ -68,6 +80,11 @@ export class Race {
 
     this.buildStatics();
     this.spawnMarbles();
+
+    // Elimination gates (sorted top-to-bottom so marbles cross them in order).
+    this.gates = (level.gates ?? [])
+      .map((g) => ({ y: g.y, quota: g.quota, crossed: 0, closed: false }))
+      .sort((a, b) => a.y - b.y);
   }
 
   /** Walls (polylines) + pegs (circles), all on a single fixed body at the origin. */
@@ -141,12 +158,17 @@ export class Race {
         finished: false,
         rank: null,
         finishFrame: null,
+        eliminated: false,
+        nextGate: 0,
       });
     }
   }
 
   get complete(): boolean {
-    return this.finishCount >= this.marbles.length || this.frameIndex >= this.maxFrames;
+    return (
+      this.finishCount + this.eliminatedCount >= this.marbles.length ||
+      this.frameIndex >= this.maxFrames
+    );
   }
 
   get frame(): number {
@@ -163,30 +185,70 @@ export class Race {
     this.world.step();
     this.frameIndex++;
 
-    const newlyFinished: number[] = [];
-    // Collect finishers first (in stable id order), then rank by how far past the line they
-    // crossed, so same-frame finishers get a deterministic, fair order.
-    const crossedThisFrame: Marble[] = [];
+    // 1. Read live positions.
     for (const m of this.marbles) {
-      if (m.finished || !m.body) continue;
+      if (m.finished || m.eliminated || !m.body) continue;
       const t = m.body.translation();
       m.x = t.x;
       m.y = t.y;
+    }
+
+    // 2. Elimination gates (no-op when the level has none).
+    if (this.gates.length > 0) this.processGates();
+
+    // 3. Finishers — ranked by how far past the line they crossed, so same-frame finishers
+    //    get a deterministic, fair order.
+    const newlyFinished: number[] = [];
+    const crossedThisFrame: Marble[] = [];
+    for (const m of this.marbles) {
+      if (m.finished || m.eliminated || !m.body) continue;
       if (m.y >= this.level.finishY) crossedThisFrame.push(m);
     }
-    crossedThisFrame.sort((a, b) => (b.y - a.y) || (a.id - b.id));
+    crossedThisFrame.sort((a, b) => b.y - a.y || a.id - b.id);
     for (const m of crossedThisFrame) {
       m.finished = true;
       m.finishFrame = this.frameIndex;
       m.rank = ++this.finishCount;
       newlyFinished.push(m.id);
-      if (m.body) {
-        this.world.removeRigidBody(m.body);
-        m.body = null;
-      }
+      this.removeBody(m);
     }
 
     return this.snapshot(newlyFinished);
+  }
+
+  /** Survival gates: record crossings, then close any gate at quota, eliminating stragglers. */
+  private processGates(): void {
+    // Phase A — crossings (a fast marble may clear several gates in one frame).
+    for (const m of this.marbles) {
+      if (m.finished || m.eliminated || !m.body) continue;
+      while (m.nextGate < this.gates.length) {
+        const g = this.gates[m.nextGate];
+        if (g.closed || m.y < g.y) break;
+        g.crossed++;
+        m.nextGate++;
+      }
+    }
+    // Phase B — close gates at quota; eliminate everyone who hadn't passed them.
+    for (let gi = 0; gi < this.gates.length; gi++) {
+      const g = this.gates[gi];
+      if (g.closed || g.crossed < g.quota) continue;
+      g.closed = true;
+      for (const m of this.marbles) {
+        if (m.finished || m.eliminated || !m.body) continue;
+        if (m.nextGate <= gi) {
+          m.eliminated = true;
+          this.eliminatedCount++;
+          this.removeBody(m);
+        }
+      }
+    }
+  }
+
+  private removeBody(m: Marble): void {
+    if (m.body) {
+      this.world.removeRigidBody(m.body);
+      m.body = null;
+    }
   }
 
   private snapshot(newlyFinished: number[]): RaceFrame {
@@ -196,13 +258,14 @@ export class Race {
       y: m.y,
       finished: m.finished,
       rank: m.rank,
+      eliminated: m.eliminated,
     }));
 
-    // Leader = furthest-down still-racing marble; drives the camera.
+    // Leader = furthest-down still-racing marble (excludes finished + eliminated); drives camera.
     let leaderId: number | null = null;
     let leaderY = -Infinity;
     for (const m of this.marbles) {
-      if (m.finished) continue;
+      if (m.finished || m.eliminated) continue;
       if (m.y > leaderY) {
         leaderY = m.y;
         leaderId = m.id;

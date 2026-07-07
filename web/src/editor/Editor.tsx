@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import Konva from "konva";
-import { Stage, Layer, Circle, Line, Rect, Group } from "react-konva";
+import { Stage, Layer, Circle, Line, Rect, Group, Text } from "react-konva";
 import type { Level } from "../level/types";
 import { parseLevel } from "../level/schema";
 import {
@@ -70,6 +70,16 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
       points: [[doc.size.width * 0.25, cy], [doc.size.width * 0.75, cy]],
       thickness: 18,
     });
+  const addGate = () => addPiece({ type: "gate", id: nextPieceId("gate"), y: cy, quota: 8 });
+
+  const selectedPiece = doc.pieces.find((p) => p.id === selectedId) ?? null;
+  const adjustGateQuota = (delta: number) =>
+    setDoc((d) => ({
+      ...d,
+      pieces: d.pieces.map((p) =>
+        p.id === selectedId && p.type === "gate" ? { ...p, quota: Math.max(1, p.quota + delta) } : p,
+      ),
+    }));
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -125,7 +135,16 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
         <button className="btn" onClick={addPegRow}>+ Peg Row</button>
         <button className="btn" onClick={addFunnel}>+ Funnel</button>
         <button className="btn" onClick={addWall}>+ Wall</button>
+        <button className="btn" onClick={addGate}>+ Gate</button>
         <button className="btn" onClick={deleteSelected} disabled={!selectedId}>Delete</button>
+        {selectedPiece?.type === "gate" && (
+          <span className="gate-quota">
+            keep
+            <button className="btn btn-mini" onClick={() => adjustGateQuota(-1)}>−</button>
+            <strong>{selectedPiece.quota}</strong>
+            <button className="btn btn-mini" onClick={() => adjustGateQuota(1)}>+</button>
+          </span>
+        )}
         <button className="btn btn-primary" onClick={handleTestRace} data-testid="test-race-btn">
           Test Race
         </button>
@@ -244,6 +263,29 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
                       strokeWidth={18}
                       lineCap="round"
                     />
+                  </Group>
+                );
+              }
+              if (piece.type === "gate") {
+                return (
+                  <Group
+                    key={piece.id}
+                    x={0}
+                    y={piece.y}
+                    draggable
+                    dragBoundFunc={(pos) => ({ x: 0, y: pos.y })}
+                    onClick={() => setSelectedId(piece.id)}
+                    onTap={() => setSelectedId(piece.id)}
+                    onDragEnd={(e) => patchPiece(piece.id, { y: Math.round(e.target.y()) })}
+                  >
+                    <Line
+                      points={[0, 0, doc.size.width, 0]}
+                      stroke={selected ? SELECT_COLOR : "#ff8c42"}
+                      strokeWidth={6 / scale}
+                      dash={[16 / scale, 10 / scale]}
+                      hitStrokeWidth={40 / scale}
+                    />
+                    <Text x={12} y={-56} text={`keep ${piece.quota}`} fontSize={44} fill="#ff8c42" />
                   </Group>
                 );
               }

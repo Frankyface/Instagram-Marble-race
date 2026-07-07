@@ -7,6 +7,8 @@ export interface MarbleState {
   finished: boolean;
   /** 1-based finishing position, or null if not finished. */
   rank: number | null;
+  /** True if knocked out at an elimination gate (didn't make the quota before it closed). */
+  eliminated: boolean;
 }
 
 /** A single simulated frame: every marble's position plus this-frame events. */

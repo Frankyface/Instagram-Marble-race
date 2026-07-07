@@ -20,16 +20,19 @@ export interface RenderOptions {
   wallColor?: string;
   pegColor?: string;
   finishColor?: string;
+  gateColor?: string;
 }
 
 const DEFAULT_BG = "#0f1115";
 const DEFAULT_WALL = "#4a5169";
 const DEFAULT_PEG = "#727a94";
 const DEFAULT_FINISH = "#ffd34d";
+const DEFAULT_GATE = "#ff8c42";
 const FALLBACK_BALL = "#cccccc";
 
 // World-space line thicknesses (× scale at draw time -> resolution independent).
 const FINISH_LINE_WORLD_THICKNESS = 5;
+const GATE_LINE_WORLD_THICKNESS = 4;
 const BALL_OUTLINE_FRACTION = 0.08; // of ball radius
 
 /** Either an on-screen (preview) or off-screen (export) 2D context — same draw API. */
@@ -77,6 +80,22 @@ export function render(
   ctx.stroke();
   ctx.restore();
 
+  // Elimination gates (orange dashed lines across the width)
+  if (level.gates && level.gates.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = opts.gateColor ?? DEFAULT_GATE;
+    ctx.lineWidth = GATE_LINE_WORLD_THICKNESS * cam.scale;
+    ctx.setLineDash([10 * cam.scale, 8 * cam.scale]);
+    for (const gate of level.gates) {
+      const gy = sy(gate.y);
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(width, gy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // Pegs
   ctx.fillStyle = opts.pegColor ?? DEFAULT_PEG;
   for (const peg of level.pegs) {
@@ -89,6 +108,7 @@ export function render(
   const ballRadius = level.marbleRadius * cam.scale;
   const outline = Math.max(1, ballRadius * BALL_OUTLINE_FRACTION);
   for (const m of frame.marbles) {
+    if (m.eliminated) continue; // knocked out at a gate -> no longer drawn
     const color = opts.colors[m.id] ?? FALLBACK_BALL;
     ctx.beginPath();
     ctx.fillStyle = color;

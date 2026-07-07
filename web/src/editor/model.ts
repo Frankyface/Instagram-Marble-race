@@ -4,14 +4,15 @@
  * those pieces down to the flat `walls`/`pegs` primitives the physics engine understands, so
  * the editor never simulates and there is a single source of truth: EditorDoc -> Level -> sim.
  */
-import type { Level, Wall, Peg, SpawnZone } from "../level/types";
+import type { Level, Wall, Peg, Gate, SpawnZone } from "../level/types";
 import { LEVEL_SCHEMA_VERSION } from "../level/types";
 
 export type EditorPiece =
   | { type: "wall"; id: string; points: [number, number][]; thickness: number }
   | { type: "peg"; id: string; x: number; y: number; radius: number }
   | { type: "pegRow"; id: string; x: number; y: number; count: number; spacing: number; radius: number }
-  | { type: "funnel"; id: string; x: number; y: number; width: number; gap: number; height: number };
+  | { type: "funnel"; id: string; x: number; y: number; width: number; gap: number; height: number }
+  | { type: "gate"; id: string; y: number; quota: number };
 
 export interface EditorDoc {
   name: string;
@@ -65,6 +66,9 @@ function expandPiece(piece: EditorPiece, walls: Wall[], pegs: Peg[]): void {
       });
       break;
     }
+    case "gate":
+      // Gates compile to level.gates, not to walls/pegs — handled in compileToLevel.
+      break;
   }
 }
 
@@ -72,7 +76,11 @@ function expandPiece(piece: EditorPiece, walls: Wall[], pegs: Peg[]): void {
 export function compileToLevel(doc: EditorDoc): Level {
   const walls: Wall[] = [];
   const pegs: Peg[] = [];
-  for (const piece of doc.pieces) expandPiece(piece, walls, pegs);
+  const gates: Gate[] = [];
+  for (const piece of doc.pieces) {
+    if (piece.type === "gate") gates.push({ y: piece.y, quota: piece.quota });
+    else expandPiece(piece, walls, pegs);
+  }
   return {
     schemaVersion: LEVEL_SCHEMA_VERSION,
     name: doc.name,
@@ -82,7 +90,7 @@ export function compileToLevel(doc: EditorDoc): Level {
     finishY: doc.finishY,
     walls,
     pegs,
-    gates: [],
+    gates,
   };
 }
 
@@ -101,6 +109,12 @@ export function levelToDoc(level: Level): EditorDoc {
       x: p.x,
       y: p.y,
       radius: p.radius,
+    })),
+    ...(level.gates ?? []).map<EditorPiece>((g) => ({
+      type: "gate",
+      id: nextPieceId("gate"),
+      y: g.y,
+      quota: g.quota,
     })),
   ];
   return {
