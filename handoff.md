@@ -7,7 +7,10 @@ Live at **https://frankyface.github.io/Instagram-Marble-race/**. Repo made publi
 ## 🎡 Post-v1 additions (2026-07-07)
 - **Spinning-wheel obstacle** — kinematic pinwheel (`Spinner` in the Level; `engine.buildSpinners` + per-step `setNextKinematicRotation`, angle = frame·speed·dt so it stays deterministic; rendered from the frame index). Editor `+ Spinner` piece. +1 determinism test (28 total).
 - **Wall endpoint handles** — selecting a wall shows a draggable handle at each polyline point to reshape it end-by-end (`Editor.tsx`).
-- **Property panel** (`editor/PropertyPanel.tsx`) — numeric controls for the selected piece (peg radius, row count/spacing, funnel w/gap/h, wall thickness, gate quota, spinner radius/arms/armWidth/speed). Replaced the old inline gate stepper.
+- **Property panel** (`editor/PropertyPanel.tsx`) — numeric controls for the selected piece (peg radius, row count/spacing, funnel w/gap/h, wall thickness, gate quota, spinner radius/arms/armWidth/speed, bumper radius, box w/h/angle°). Replaced the old inline gate stepper.
+- **Bumper + Box obstacles** — `Bumper` (bouncy high-restitution circle, `BUMPER_RESTITUTION=0.9`) and `Box` (solid rotatable cuboid) in the Level; engine colliders + render + editor pieces + panel fields.
+- **Reversible spinner** — property-panel "⟲ reverse" button flips `speed` sign (negative speed already supported).
+- **Random track generator** (`level/generate.ts`) — `generateLevel(seed)` builds a finishable custom course (side walls + random peg rows / funnels / spinners / bumpers / boxes / angled deflectors via `mulberry32`). App has a 🎲 Random-race button + a reproducible seed field. Tests: valid/deterministic/varied/raceable (33 total). Deployed (`e84b7d7`).
 
 ## 🏗️ Build status (2026-07-07) — S0–S6 done, verified in-browser
 The coloured-balls web app is **built and working** in `web/` (branch `stage-6/web-app`, uncommitted). Verified via `vitest` (21 tests) + `npm run build` + live browser preview (python http.server on `web/dist`, screenshots).
