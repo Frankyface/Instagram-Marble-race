@@ -242,6 +242,35 @@ body {
   max-width: 620px;
 }
 
+.btn-danger {
+  background: #7a2a2a;
+  border-color: #7a2a2a;
+  color: #ffe3e3;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #963636;
+}
+
+.editor-course {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.editor-course input {
+  width: 92px;
+  background: #212633;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
 .editor-stage {
   background: var(--bg);
   border: 1px solid var(--border);

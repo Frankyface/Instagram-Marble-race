@@ -33,6 +33,14 @@ export function nextPieceId(prefix: string): string {
   return `${prefix}-${idCounter}`;
 }
 
+/** A blank-but-raceable course: just the two full-height side walls. Used by editor "Clear". */
+export function blankPieces(width: number, height: number): EditorPiece[] {
+  return [
+    { type: "wall", id: nextPieceId("wall"), points: [[0, 0], [0, height]], thickness: 20 },
+    { type: "wall", id: nextPieceId("wall"), points: [[width, 0], [width, height]], thickness: 20 },
+  ];
+}
+
 export const FUNNEL_WALL_THICKNESS = 18;
 
 /** Expand a single piece to the wall/peg primitives it represents. */

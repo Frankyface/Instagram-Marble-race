@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import classicFunnel from "../../levels/classic-funnel.json";
 import { parseLevel } from "../level/schema";
-import { compileToLevel, levelToDoc, nextPieceId, type EditorDoc } from "./model";
+import { blankPieces, compileToLevel, levelToDoc, nextPieceId, type EditorDoc } from "./model";
 
 function baseDoc(pieces: EditorDoc["pieces"]): EditorDoc {
   return {
@@ -62,5 +62,13 @@ describe("editor model", () => {
     const a = nextPieceId("p");
     const b = nextPieceId("p");
     expect(a).not.toBe(b);
+  });
+
+  it("blankPieces gives two full-height side walls that compile to a valid level", () => {
+    const pieces = blankPieces(720, 3200);
+    expect(pieces).toHaveLength(2);
+    expect(pieces.every((p) => p.type === "wall")).toBe(true);
+    const level = compileToLevel({ ...baseDoc([]), pieces });
+    expect(() => parseLevel(level)).not.toThrow();
   });
 });

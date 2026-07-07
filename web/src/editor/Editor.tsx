@@ -4,6 +4,7 @@ import { Stage, Layer, Circle, Line, Rect, Group, Text } from "react-konva";
 import type { Level } from "../level/types";
 import { parseLevel } from "../level/schema";
 import {
+  blankPieces,
   compileToLevel,
   levelToDoc,
   nextPieceId,
@@ -14,6 +15,7 @@ import { PropertyPanel } from "./PropertyPanel";
 
 const STAGE_W = 400;
 const STAGE_H = 680;
+const EXTEND_BY = 800;
 const SELECT_COLOR = "#5b8cff";
 const WALL_COLOR = "#8a92a8";
 const PEG_COLOR = "#c9cfe0";
@@ -77,6 +79,32 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
   const addBumper = () => addPiece({ type: "bumper", id: nextPieceId("bumper"), x: cx, y: cy, radius: 30 });
   const addBox = () =>
     addPiece({ type: "box", id: nextPieceId("box"), x: cx, y: cy, width: 220, height: 40, angle: 0 });
+
+  // Extend the course: grow the height, push the finish line down (adding raceable space), and
+  // lengthen any wall that reached the old bottom (so the side walls follow).
+  const extendCourse = () =>
+    setDoc((d) => {
+      const oldH = d.size.height;
+      const newH = oldH + EXTEND_BY;
+      const pieces = d.pieces.map((p) =>
+        p.type === "wall"
+          ? {
+              ...p,
+              points: p.points.map(
+                ([x, y]) => (y >= oldH - 1 ? [x, newH] : [x, y]) as [number, number],
+              ),
+            }
+          : p,
+      );
+      return { ...d, size: { ...d.size, height: newH }, finishY: d.finishY + EXTEND_BY, pieces };
+    });
+  const setFinishY = (v: number) =>
+    setDoc((d) => ({ ...d, finishY: Math.max(200, Math.min(v, d.size.height - 40)) }));
+  const clearCourse = () => {
+    if (!window.confirm("Clear the course? This removes all pieces (keeps the side walls).")) return;
+    setDoc((d) => ({ ...d, pieces: blankPieces(d.size.width, d.size.height) }));
+    setSelectedId(null);
+  };
 
   const selectedPiece = doc.pieces.find((p) => p.id === selectedId) ?? null;
 
@@ -154,6 +182,26 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
               if (f) handleLoad(f);
               e.target.value = "";
             }}
+          />
+        </label>
+        <button className="btn btn-danger" onClick={clearCourse} data-testid="clear-btn">
+          Clear
+        </button>
+      </div>
+
+      <div className="editor-course">
+        <span className="muted">length {doc.size.height}px</span>
+        <button className="btn btn-mini" onClick={extendCourse} data-testid="extend-btn">
+          Extend +{EXTEND_BY}
+        </button>
+        <label className="prop-field">
+          finish Y
+          <input
+            type="number"
+            value={doc.finishY}
+            min={200}
+            step={50}
+            onChange={(e) => setFinishY(Number(e.target.value))}
           />
         </label>
       </div>
