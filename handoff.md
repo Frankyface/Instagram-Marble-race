@@ -1,5 +1,13 @@
 # Handoff — Followers Marble Race
-_Last updated: 2026-07-07 · Current stage: Stage 6 — Web App + Level Editor (PIVOTED to coloured-balls; **S0–S6 + S9 + S10 BUILT + VERIFIED** — all 3 race modes (single / elimination / brackets) + editor + MP4 export, 27 tests. Only S7/S8 (polish) remain. **DEPLOY BLOCKED**: repo is private; GitHub Pages needs a public repo on the free plan — user decision pending.)_
+_Last updated: 2026-07-07 · Current stage: Stage 6 — Web App + Level Editor (PIVOTED to coloured-balls; **S0–S6 + S9 + S10 BUILT + VERIFIED** — all 3 race modes (single / elimination / brackets) + editor + MP4 export, 27 tests. **DEPLOYED LIVE** at https://frankyface.github.io/Instagram-Marble-race/ (repo made public). Now also has a **spinning-wheel** obstacle, **wall endpoint drag handles**, and a **per-piece property panel**. Only S7/S8 polish remain.)_
+
+## 🚀 Deployed (2026-07-07)
+Live at **https://frankyface.github.io/Instagram-Marble-race/**. Repo made public; GitHub Pages enabled via API (`POST /pages` build_type=workflow) after the workflow's `configure-pages` enablement step kept failing on the workflow token — the `enablement:true` flag was then removed. Deploys automatically on push to `main` (paths `web/**`). Latest deploy = commit `990ee28`.
+
+## 🎡 Post-v1 additions (2026-07-07)
+- **Spinning-wheel obstacle** — kinematic pinwheel (`Spinner` in the Level; `engine.buildSpinners` + per-step `setNextKinematicRotation`, angle = frame·speed·dt so it stays deterministic; rendered from the frame index). Editor `+ Spinner` piece. +1 determinism test (28 total).
+- **Wall endpoint handles** — selecting a wall shows a draggable handle at each polyline point to reshape it end-by-end (`Editor.tsx`).
+- **Property panel** (`editor/PropertyPanel.tsx`) — numeric controls for the selected piece (peg radius, row count/spacing, funnel w/gap/h, wall thickness, gate quota, spinner radius/arms/armWidth/speed). Replaced the old inline gate stepper.
 
 ## 🏗️ Build status (2026-07-07) — S0–S6 done, verified in-browser
 The coloured-balls web app is **built and working** in `web/` (branch `stage-6/web-app`, uncommitted). Verified via `vitest` (21 tests) + `npm run build` + live browser preview (python http.server on `web/dist`, screenshots).
