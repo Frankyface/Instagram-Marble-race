@@ -43,6 +43,23 @@ export type Gate = {
   quota: number;
 };
 
+/**
+ * A rotating "pinwheel" obstacle: a kinematic body at (x,y) with `arms` radial paddles that
+ * spin at `speed` radians/second. Deterministic — its angle is a pure function of the frame.
+ */
+export type Spinner = {
+  x: number;
+  y: number;
+  /** Arm length from the centre (world units). */
+  radius: number;
+  /** Number of radial arms. */
+  arms: number;
+  /** Half-thickness of each arm (world units). */
+  armWidth: number;
+  /** Rotation speed in radians per second (may be negative to reverse). */
+  speed: number;
+};
+
 export type Level = {
   schemaVersion: number;
   name: string;
@@ -55,4 +72,5 @@ export type Level = {
   walls: Wall[];
   pegs: Peg[];
   gates?: Gate[];
+  spinners?: Spinner[];
 };

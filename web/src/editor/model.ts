@@ -4,7 +4,7 @@
  * those pieces down to the flat `walls`/`pegs` primitives the physics engine understands, so
  * the editor never simulates and there is a single source of truth: EditorDoc -> Level -> sim.
  */
-import type { Level, Wall, Peg, Gate, SpawnZone } from "../level/types";
+import type { Level, Wall, Peg, Gate, Spinner, SpawnZone } from "../level/types";
 import { LEVEL_SCHEMA_VERSION } from "../level/types";
 
 export type EditorPiece =
@@ -12,7 +12,8 @@ export type EditorPiece =
   | { type: "peg"; id: string; x: number; y: number; radius: number }
   | { type: "pegRow"; id: string; x: number; y: number; count: number; spacing: number; radius: number }
   | { type: "funnel"; id: string; x: number; y: number; width: number; gap: number; height: number }
-  | { type: "gate"; id: string; y: number; quota: number };
+  | { type: "gate"; id: string; y: number; quota: number }
+  | { type: "spinner"; id: string; x: number; y: number; radius: number; arms: number; armWidth: number; speed: number };
 
 export interface EditorDoc {
   name: string;
@@ -67,7 +68,8 @@ function expandPiece(piece: EditorPiece, walls: Wall[], pegs: Peg[]): void {
       break;
     }
     case "gate":
-      // Gates compile to level.gates, not to walls/pegs — handled in compileToLevel.
+    case "spinner":
+      // Gates -> level.gates, spinners -> level.spinners — both handled in compileToLevel.
       break;
   }
 }
@@ -77,9 +79,22 @@ export function compileToLevel(doc: EditorDoc): Level {
   const walls: Wall[] = [];
   const pegs: Peg[] = [];
   const gates: Gate[] = [];
+  const spinners: Spinner[] = [];
   for (const piece of doc.pieces) {
-    if (piece.type === "gate") gates.push({ y: piece.y, quota: piece.quota });
-    else expandPiece(piece, walls, pegs);
+    if (piece.type === "gate") {
+      gates.push({ y: piece.y, quota: piece.quota });
+    } else if (piece.type === "spinner") {
+      spinners.push({
+        x: piece.x,
+        y: piece.y,
+        radius: piece.radius,
+        arms: piece.arms,
+        armWidth: piece.armWidth,
+        speed: piece.speed,
+      });
+    } else {
+      expandPiece(piece, walls, pegs);
+    }
   }
   return {
     schemaVersion: LEVEL_SCHEMA_VERSION,
@@ -91,6 +106,7 @@ export function compileToLevel(doc: EditorDoc): Level {
     walls,
     pegs,
     gates,
+    spinners,
   };
 }
 
@@ -115,6 +131,16 @@ export function levelToDoc(level: Level): EditorDoc {
       id: nextPieceId("gate"),
       y: g.y,
       quota: g.quota,
+    })),
+    ...(level.spinners ?? []).map<EditorPiece>((s) => ({
+      type: "spinner",
+      id: nextPieceId("spinner"),
+      x: s.x,
+      y: s.y,
+      radius: s.radius,
+      arms: s.arms,
+      armWidth: s.armWidth,
+      speed: s.speed,
     })),
   ];
   return {

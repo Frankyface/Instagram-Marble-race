@@ -253,3 +253,40 @@ body {
   min-width: 1.2rem;
   text-align: center;
 }
+
+.prop-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-width: 620px;
+}
+
+.prop-title {
+  text-transform: capitalize;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.prop-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.prop-field input {
+  width: 64px;
+  background: #212633;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}

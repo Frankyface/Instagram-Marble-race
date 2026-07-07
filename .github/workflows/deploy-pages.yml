@@ -25,11 +25,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-      # Auto-enables GitHub Pages (source = GitHub Actions) on the first run, so no manual
-      # repo-settings step is needed.
+      # Pages is already enabled (source = GitHub Actions); this just reads its config.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22

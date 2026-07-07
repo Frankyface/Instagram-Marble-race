@@ -7,6 +7,7 @@
  */
 import type { Level } from "../level/types";
 import type { RaceFrame } from "../race/types";
+import { FIXED_TIMESTEP } from "../race/engine";
 import { getCameraTransform } from "./camera";
 
 export interface RenderOptions {
@@ -21,6 +22,7 @@ export interface RenderOptions {
   pegColor?: string;
   finishColor?: string;
   gateColor?: string;
+  spinnerColor?: string;
 }
 
 const DEFAULT_BG = "#0f1115";
@@ -28,6 +30,7 @@ const DEFAULT_WALL = "#4a5169";
 const DEFAULT_PEG = "#727a94";
 const DEFAULT_FINISH = "#ffd34d";
 const DEFAULT_GATE = "#ff8c42";
+const DEFAULT_SPINNER = "#9d84e0";
 const FALLBACK_BALL = "#cccccc";
 
 // World-space line thicknesses (× scale at draw time -> resolution independent).
@@ -102,6 +105,29 @@ export function render(
     ctx.beginPath();
     ctx.arc(sx(peg.x), sy(peg.y), peg.radius * cam.scale, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Spinners (rotating pinwheels — angle derived from the frame so preview == export)
+  if (level.spinners && level.spinners.length > 0) {
+    ctx.fillStyle = opts.spinnerColor ?? DEFAULT_SPINNER;
+    for (const spin of level.spinners) {
+      const angle = frame.frame * spin.speed * FIXED_TIMESTEP;
+      const armLen = spin.radius * cam.scale;
+      const armW = spin.armWidth * cam.scale;
+      ctx.save();
+      ctx.translate(sx(spin.x), sy(spin.y));
+      const armCount = Math.max(1, Math.floor(spin.arms));
+      for (let i = 0; i < armCount; i++) {
+        ctx.save();
+        ctx.rotate(angle + (Math.PI * 2 * i) / armCount);
+        ctx.fillRect(0, -armW, armLen, armW * 2);
+        ctx.restore();
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, armW * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   // Marbles

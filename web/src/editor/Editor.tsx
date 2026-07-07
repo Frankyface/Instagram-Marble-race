@@ -10,6 +10,7 @@ import {
   type EditorDoc,
   type EditorPiece,
 } from "./model";
+import { PropertyPanel } from "./PropertyPanel";
 
 const STAGE_W = 400;
 const STAGE_H = 680;
@@ -71,15 +72,10 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
       thickness: 18,
     });
   const addGate = () => addPiece({ type: "gate", id: nextPieceId("gate"), y: cy, quota: 8 });
+  const addSpinner = () =>
+    addPiece({ type: "spinner", id: nextPieceId("spinner"), x: cx, y: cy, radius: 150, arms: 3, armWidth: 16, speed: 3 });
 
   const selectedPiece = doc.pieces.find((p) => p.id === selectedId) ?? null;
-  const adjustGateQuota = (delta: number) =>
-    setDoc((d) => ({
-      ...d,
-      pieces: d.pieces.map((p) =>
-        p.id === selectedId && p.type === "gate" ? { ...p, quota: Math.max(1, p.quota + delta) } : p,
-      ),
-    }));
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -136,15 +132,8 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
         <button className="btn" onClick={addFunnel}>+ Funnel</button>
         <button className="btn" onClick={addWall}>+ Wall</button>
         <button className="btn" onClick={addGate}>+ Gate</button>
+        <button className="btn" onClick={addSpinner}>+ Spinner</button>
         <button className="btn" onClick={deleteSelected} disabled={!selectedId}>Delete</button>
-        {selectedPiece?.type === "gate" && (
-          <span className="gate-quota">
-            keep
-            <button className="btn btn-mini" onClick={() => adjustGateQuota(-1)}>−</button>
-            <strong>{selectedPiece.quota}</strong>
-            <button className="btn btn-mini" onClick={() => adjustGateQuota(1)}>+</button>
-          </span>
-        )}
         <button className="btn btn-primary" onClick={handleTestRace} data-testid="test-race-btn">
           Test Race
         </button>
@@ -289,6 +278,37 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
                   </Group>
                 );
               }
+              if (piece.type === "spinner") {
+                const armCount = Math.max(1, piece.arms);
+                return (
+                  <Group
+                    key={piece.id}
+                    x={piece.x}
+                    y={piece.y}
+                    draggable
+                    onClick={() => setSelectedId(piece.id)}
+                    onTap={() => setSelectedId(piece.id)}
+                    onDragEnd={(e) =>
+                      patchPiece(piece.id, { x: Math.round(e.target.x()), y: Math.round(e.target.y()) })
+                    }
+                  >
+                    <Circle x={0} y={0} radius={piece.radius} stroke="#9d84e055" strokeWidth={2 / scale} />
+                    {Array.from({ length: armCount }, (_, i) => {
+                      const theta = (Math.PI * 2 * i) / armCount;
+                      return (
+                        <Line
+                          key={i}
+                          points={[0, 0, piece.radius * Math.cos(theta), piece.radius * Math.sin(theta)]}
+                          stroke={selected ? SELECT_COLOR : "#9d84e0"}
+                          strokeWidth={piece.armWidth * 2}
+                          lineCap="round"
+                        />
+                      );
+                    })}
+                    <Circle x={0} y={0} radius={piece.armWidth * 1.7} fill={selected ? SELECT_COLOR : "#9d84e0"} />
+                  </Group>
+                );
+              }
               // wall
               return (
                 <Line
@@ -314,6 +334,29 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
               );
             })}
 
+            {/* Wall endpoint handles — grab an end of the selected wall to reshape it. */}
+            {selectedPiece?.type === "wall" &&
+              selectedPiece.points.map((pt, i) => (
+                <Circle
+                  key={`handle-${i}`}
+                  x={pt[0]}
+                  y={pt[1]}
+                  radius={14 / scale}
+                  fill="#ffffff"
+                  stroke={SELECT_COLOR}
+                  strokeWidth={3 / scale}
+                  draggable
+                  onDragEnd={(e) => {
+                    const np = selectedPiece.points.map((p, j) =>
+                      j === i
+                        ? ([Math.round(e.target.x()), Math.round(e.target.y())] as [number, number])
+                        : p,
+                    );
+                    patchPiece(selectedPiece.id, { points: np });
+                  }}
+                />
+              ))}
+
             {/* Finish line */}
             <Line
               points={[0, 0, doc.size.width, 0]}
@@ -329,6 +372,13 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
           </Layer>
         </Stage>
       </div>
+
+      <PropertyPanel
+        piece={selectedPiece}
+        onChange={(patch) => {
+          if (selectedId) patchPiece(selectedId, patch);
+        }}
+      />
 
       <p className="editor-hint muted">
         Scroll to pan · click a piece to select · drag to move · {selectedType ? `selected: ${selectedType}` : "nothing selected"}

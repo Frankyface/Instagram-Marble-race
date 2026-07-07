@@ -35,6 +35,15 @@ const GateSchema = z.object({
   quota: z.number().int().nonnegative(),
 });
 
+const SpinnerSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  radius: z.number().positive(),
+  arms: z.number().int().min(1).max(12),
+  armWidth: z.number().positive(),
+  speed: z.number(),
+});
+
 export const LevelSchema = z.object({
   // Kept as `number` (not `z.literal`) so the inferred type matches the keystone `Level`
   // type; the refine still rejects any unsupported version.
@@ -52,6 +61,7 @@ export const LevelSchema = z.object({
   walls: z.array(WallSchema),
   pegs: z.array(PegSchema),
   gates: z.array(GateSchema).optional(),
+  spinners: z.array(SpinnerSchema).optional(),
 });
 
 /** Parse + validate untrusted data into a `Level`, throwing a `ZodError` on failure. */

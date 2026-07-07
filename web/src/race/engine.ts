@@ -25,6 +25,7 @@ export const MARBLE_DENSITY = 1;
 export const MARBLE_LINEAR_DAMPING = 0.04;
 export const PEG_RESTITUTION = 0.4;
 export const WALL_RESTITUTION = 0.15;
+export const SPINNER_RESTITUTION = 0.4;
 export const OBSTACLE_FRICTION = 0.1;
 /** Hard safety cap so a stuck marble can never hang the sim (90s @ 60fps). */
 export const DEFAULT_MAX_FRAMES = 60 * 90;
@@ -69,6 +70,7 @@ export class Race {
   private lastLeaderId: number | null = null;
   private cameraTargetY = 0;
   private gates: GateState[] = [];
+  private spinnerBodies: { body: RAPIER.RigidBody; speed: number }[] = [];
 
   constructor(level: Level, config: RaceConfig, maxFrames: number = DEFAULT_MAX_FRAMES) {
     this.level = level;
@@ -79,6 +81,7 @@ export class Race {
     this.world.timestep = FIXED_TIMESTEP;
 
     this.buildStatics();
+    this.buildSpinners();
     this.spawnMarbles();
 
     // Elimination gates (sorted top-to-bottom so marbles cross them in order).
@@ -109,6 +112,27 @@ export class Race {
         .setRestitution(PEG_RESTITUTION)
         .setFriction(OBSTACLE_FRICTION);
       this.world.createCollider(desc, staticBody);
+    }
+  }
+
+  /** Kinematic pinwheel obstacles: each arm is a cuboid extending from centre to `radius`. */
+  private buildSpinners(): void {
+    for (const s of this.level.spinners ?? []) {
+      const body = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(s.x, s.y),
+      );
+      const arms = Math.max(1, Math.floor(s.arms));
+      const halfLen = s.radius / 2;
+      for (let i = 0; i < arms; i++) {
+        const theta = (Math.PI * 2 * i) / arms;
+        const desc = RAPIER.ColliderDesc.cuboid(halfLen, s.armWidth)
+          .setTranslation(halfLen * Math.cos(theta), halfLen * Math.sin(theta))
+          .setRotation(theta)
+          .setRestitution(SPINNER_RESTITUTION)
+          .setFriction(OBSTACLE_FRICTION);
+        this.world.createCollider(desc, body);
+      }
+      this.spinnerBodies.push({ body, speed: s.speed });
     }
   }
 
@@ -182,6 +206,13 @@ export class Race {
 
   /** Advance exactly one fixed timestep and return the resulting frame state. */
   step(): RaceFrame {
+    // Spin the pinwheels first — angle is a pure function of the frame, so it stays deterministic.
+    if (this.spinnerBodies.length > 0) {
+      const nextFrame = this.frameIndex + 1;
+      for (const s of this.spinnerBodies) {
+        s.body.setNextKinematicRotation(nextFrame * s.speed * FIXED_TIMESTEP);
+      }
+    }
     this.world.step();
     this.frameIndex++;
 

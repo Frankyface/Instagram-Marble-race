@@ -112,3 +112,20 @@ describe("Race engine elimination gates", () => {
     20000,
   );
 });
+
+describe("Race engine spinners", () => {
+  it(
+    "stays deterministic with a spinning pinwheel obstacle",
+    () => {
+      const spun: Level = {
+        ...level,
+        spinners: [{ x: 360, y: 1500, radius: 150, arms: 3, armWidth: 16, speed: 3 }],
+      };
+      const a = runFull({ ballCount: 16, seed: 5 }, DEFAULT_MAX_FRAMES, spun);
+      const b = runFull({ ballCount: 16, seed: 5 }, DEFAULT_MAX_FRAMES, spun);
+      expect(a.frames).toEqual(b.frames);
+      expect(a.finished).toBeGreaterThanOrEqual(1);
+    },
+    20000,
+  );
+});
