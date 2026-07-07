@@ -4,7 +4,7 @@
  * those pieces down to the flat `walls`/`pegs` primitives the physics engine understands, so
  * the editor never simulates and there is a single source of truth: EditorDoc -> Level -> sim.
  */
-import type { Level, Wall, Peg, Gate, Spinner, SpawnZone } from "../level/types";
+import type { Level, Wall, Peg, Gate, Spinner, Bumper, Box, SpawnZone } from "../level/types";
 import { LEVEL_SCHEMA_VERSION } from "../level/types";
 
 export type EditorPiece =
@@ -13,7 +13,9 @@ export type EditorPiece =
   | { type: "pegRow"; id: string; x: number; y: number; count: number; spacing: number; radius: number }
   | { type: "funnel"; id: string; x: number; y: number; width: number; gap: number; height: number }
   | { type: "gate"; id: string; y: number; quota: number }
-  | { type: "spinner"; id: string; x: number; y: number; radius: number; arms: number; armWidth: number; speed: number };
+  | { type: "spinner"; id: string; x: number; y: number; radius: number; arms: number; armWidth: number; speed: number }
+  | { type: "bumper"; id: string; x: number; y: number; radius: number }
+  | { type: "box"; id: string; x: number; y: number; width: number; height: number; angle: number };
 
 export interface EditorDoc {
   name: string;
@@ -69,7 +71,9 @@ function expandPiece(piece: EditorPiece, walls: Wall[], pegs: Peg[]): void {
     }
     case "gate":
     case "spinner":
-      // Gates -> level.gates, spinners -> level.spinners — both handled in compileToLevel.
+    case "bumper":
+    case "box":
+      // These map to their own Level arrays — handled in compileToLevel, not here.
       break;
   }
 }
@@ -80,6 +84,8 @@ export function compileToLevel(doc: EditorDoc): Level {
   const pegs: Peg[] = [];
   const gates: Gate[] = [];
   const spinners: Spinner[] = [];
+  const bumpers: Bumper[] = [];
+  const boxes: Box[] = [];
   for (const piece of doc.pieces) {
     if (piece.type === "gate") {
       gates.push({ y: piece.y, quota: piece.quota });
@@ -92,6 +98,10 @@ export function compileToLevel(doc: EditorDoc): Level {
         armWidth: piece.armWidth,
         speed: piece.speed,
       });
+    } else if (piece.type === "bumper") {
+      bumpers.push({ x: piece.x, y: piece.y, radius: piece.radius });
+    } else if (piece.type === "box") {
+      boxes.push({ x: piece.x, y: piece.y, width: piece.width, height: piece.height, angle: piece.angle });
     } else {
       expandPiece(piece, walls, pegs);
     }
@@ -107,6 +117,8 @@ export function compileToLevel(doc: EditorDoc): Level {
     pegs,
     gates,
     spinners,
+    bumpers,
+    boxes,
   };
 }
 
@@ -141,6 +153,22 @@ export function levelToDoc(level: Level): EditorDoc {
       arms: s.arms,
       armWidth: s.armWidth,
       speed: s.speed,
+    })),
+    ...(level.bumpers ?? []).map<EditorPiece>((b) => ({
+      type: "bumper",
+      id: nextPieceId("bumper"),
+      x: b.x,
+      y: b.y,
+      radius: b.radius,
+    })),
+    ...(level.boxes ?? []).map<EditorPiece>((b) => ({
+      type: "box",
+      id: nextPieceId("box"),
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+      angle: b.angle,
     })),
   ];
   return {

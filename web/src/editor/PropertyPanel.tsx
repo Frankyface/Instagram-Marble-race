@@ -71,6 +71,29 @@ export function PropertyPanel({ piece, onChange }: PropertyPanelProps) {
           <NumField label="arms" value={p.arms} min={1} max={12} onChange={(v) => onChange({ arms: v })} />
           <NumField label="armWidth" value={p.armWidth} min={4} onChange={(v) => onChange({ armWidth: v })} />
           <NumField label="speed" value={p.speed} step={0.5} onChange={(v) => onChange({ speed: v })} />
+          <button
+            type="button"
+            className="btn btn-mini"
+            onClick={() => onChange({ speed: -p.speed })}
+            title="Spin the other way"
+          >
+            ⟲ reverse
+          </button>
+        </>
+      )}
+      {p.type === "bumper" && (
+        <NumField label="radius" value={p.radius} min={8} onChange={(v) => onChange({ radius: v })} />
+      )}
+      {p.type === "box" && (
+        <>
+          <NumField label="width" value={p.width} min={10} onChange={(v) => onChange({ width: v })} />
+          <NumField label="height" value={p.height} min={10} onChange={(v) => onChange({ height: v })} />
+          <NumField
+            label="angle°"
+            value={Math.round((p.angle * 180) / Math.PI)}
+            step={5}
+            onChange={(v) => onChange({ angle: (v * Math.PI) / 180 })}
+          />
         </>
       )}
     </div>

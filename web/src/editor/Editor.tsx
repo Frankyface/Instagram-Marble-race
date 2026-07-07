@@ -74,6 +74,9 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
   const addGate = () => addPiece({ type: "gate", id: nextPieceId("gate"), y: cy, quota: 8 });
   const addSpinner = () =>
     addPiece({ type: "spinner", id: nextPieceId("spinner"), x: cx, y: cy, radius: 150, arms: 3, armWidth: 16, speed: 3 });
+  const addBumper = () => addPiece({ type: "bumper", id: nextPieceId("bumper"), x: cx, y: cy, radius: 30 });
+  const addBox = () =>
+    addPiece({ type: "box", id: nextPieceId("box"), x: cx, y: cy, width: 220, height: 40, angle: 0 });
 
   const selectedPiece = doc.pieces.find((p) => p.id === selectedId) ?? null;
 
@@ -133,6 +136,8 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
         <button className="btn" onClick={addWall}>+ Wall</button>
         <button className="btn" onClick={addGate}>+ Gate</button>
         <button className="btn" onClick={addSpinner}>+ Spinner</button>
+        <button className="btn" onClick={addBumper}>+ Bumper</button>
+        <button className="btn" onClick={addBox}>+ Box</button>
         <button className="btn" onClick={deleteSelected} disabled={!selectedId}>Delete</button>
         <button className="btn btn-primary" onClick={handleTestRace} data-testid="test-race-btn">
           Test Race
@@ -307,6 +312,48 @@ export function Editor({ initialLevel, onTestRace }: EditorProps) {
                     })}
                     <Circle x={0} y={0} radius={piece.armWidth * 1.7} fill={selected ? SELECT_COLOR : "#9d84e0"} />
                   </Group>
+                );
+              }
+              if (piece.type === "bumper") {
+                return (
+                  <Circle
+                    key={piece.id}
+                    x={piece.x}
+                    y={piece.y}
+                    radius={piece.radius}
+                    fill={selected ? SELECT_COLOR : "#ff5c8a"}
+                    stroke="#ffffffaa"
+                    strokeWidth={selected ? 5 / scale : 3 / scale}
+                    draggable
+                    onClick={() => setSelectedId(piece.id)}
+                    onTap={() => setSelectedId(piece.id)}
+                    onDragEnd={(e) =>
+                      patchPiece(piece.id, { x: Math.round(e.target.x()), y: Math.round(e.target.y()) })
+                    }
+                  />
+                );
+              }
+              if (piece.type === "box") {
+                return (
+                  <Rect
+                    key={piece.id}
+                    x={piece.x}
+                    y={piece.y}
+                    width={piece.width}
+                    height={piece.height}
+                    offsetX={piece.width / 2}
+                    offsetY={piece.height / 2}
+                    rotation={(piece.angle * 180) / Math.PI}
+                    fill={selected ? SELECT_COLOR : "#626b82"}
+                    stroke={selected ? SELECT_COLOR : undefined}
+                    strokeWidth={selected ? 3 / scale : 0}
+                    draggable
+                    onClick={() => setSelectedId(piece.id)}
+                    onTap={() => setSelectedId(piece.id)}
+                    onDragEnd={(e) =>
+                      patchPiece(piece.id, { x: Math.round(e.target.x()), y: Math.round(e.target.y()) })
+                    }
+                  />
                 );
               }
               // wall

@@ -23,6 +23,8 @@ export interface RenderOptions {
   finishColor?: string;
   gateColor?: string;
   spinnerColor?: string;
+  bumperColor?: string;
+  boxColor?: string;
 }
 
 const DEFAULT_BG = "#0f1115";
@@ -31,6 +33,8 @@ const DEFAULT_PEG = "#727a94";
 const DEFAULT_FINISH = "#ffd34d";
 const DEFAULT_GATE = "#ff8c42";
 const DEFAULT_SPINNER = "#9d84e0";
+const DEFAULT_BUMPER = "#ff5c8a";
+const DEFAULT_BOX = "#626b82";
 const FALLBACK_BALL = "#cccccc";
 
 // World-space line thicknesses (× scale at draw time -> resolution independent).
@@ -105,6 +109,38 @@ export function render(
     ctx.beginPath();
     ctx.arc(sx(peg.x), sy(peg.y), peg.radius * cam.scale, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Boxes (solid rotatable blocks)
+  if (level.boxes && level.boxes.length > 0) {
+    ctx.fillStyle = opts.boxColor ?? DEFAULT_BOX;
+    for (const box of level.boxes) {
+      ctx.save();
+      ctx.translate(sx(box.x), sy(box.y));
+      ctx.rotate(box.angle);
+      const w = box.width * cam.scale;
+      const h = box.height * cam.scale;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+
+  // Bumpers (bouncy — bright inner ring)
+  if (level.bumpers && level.bumpers.length > 0) {
+    for (const bumper of level.bumpers) {
+      const r = bumper.radius * cam.scale;
+      const bxs = sx(bumper.x);
+      const bys = sy(bumper.y);
+      ctx.beginPath();
+      ctx.fillStyle = opts.bumperColor ?? DEFAULT_BUMPER;
+      ctx.arc(bxs, bys, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(255,255,255,0.65)";
+      ctx.lineWidth = Math.max(1, r * 0.16);
+      ctx.arc(bxs, bys, r * 0.58, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   // Spinners (rotating pinwheels — angle derived from the frame so preview == export)

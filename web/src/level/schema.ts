@@ -44,6 +44,20 @@ const SpinnerSchema = z.object({
   speed: z.number(),
 });
 
+const BumperSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  radius: z.number().positive(),
+});
+
+const BoxSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  angle: z.number(),
+});
+
 export const LevelSchema = z.object({
   // Kept as `number` (not `z.literal`) so the inferred type matches the keystone `Level`
   // type; the refine still rejects any unsupported version.
@@ -62,6 +76,8 @@ export const LevelSchema = z.object({
   pegs: z.array(PegSchema),
   gates: z.array(GateSchema).optional(),
   spinners: z.array(SpinnerSchema).optional(),
+  bumpers: z.array(BumperSchema).optional(),
+  boxes: z.array(BoxSchema).optional(),
 });
 
 /** Parse + validate untrusted data into a `Level`, throwing a `ZodError` on failure. */

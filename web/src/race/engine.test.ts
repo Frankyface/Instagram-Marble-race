@@ -3,6 +3,7 @@ import classicFunnel from "../../levels/classic-funnel.json";
 import { parseLevel } from "../level/schema";
 import type { Level } from "../level/types";
 import type { RaceConfig } from "./config";
+import { generateLevel } from "../level/generate";
 import { buildRace, initPhysics, DEFAULT_MAX_FRAMES } from "./engine";
 
 let level: Level;
@@ -127,5 +128,20 @@ describe("Race engine spinners", () => {
       expect(a.finished).toBeGreaterThanOrEqual(1);
     },
     20000,
+  );
+});
+
+describe("generated random levels", () => {
+  it(
+    "race to completion with at least one finisher (playable courses)",
+    () => {
+      for (const seed of [42, 7, 123]) {
+        const lvl = generateLevel(seed);
+        const r = runFull({ ballCount: 16, seed: 2 }, DEFAULT_MAX_FRAMES, lvl);
+        expect(r.frameCount).toBeLessThanOrEqual(DEFAULT_MAX_FRAMES);
+        expect(r.finished).toBeGreaterThanOrEqual(1);
+      }
+    },
+    30000,
   );
 });

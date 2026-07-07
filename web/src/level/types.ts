@@ -60,6 +60,22 @@ export type Spinner = {
   speed: number;
 };
 
+/** A bouncy circular bumper (pinball-style) — a peg with high restitution. */
+export type Bumper = {
+  x: number;
+  y: number;
+  radius: number;
+};
+
+/** A solid rotatable rectangular block. `angle` is in radians (clockwise, y-down). */
+export type Box = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  angle: number;
+};
+
 export type Level = {
   schemaVersion: number;
   name: string;
@@ -73,4 +89,6 @@ export type Level = {
   pegs: Peg[];
   gates?: Gate[];
   spinners?: Spinner[];
+  bumpers?: Bumper[];
+  boxes?: Box[];
 };

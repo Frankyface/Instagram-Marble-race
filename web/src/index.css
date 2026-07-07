@@ -198,6 +198,33 @@ body {
   color: #0b1020;
 }
 
+.track-gen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.seed-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.seed-field input {
+  width: 120px;
+  background: #212633;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
 /* Editor */
 .editor {
   display: flex;

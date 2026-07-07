@@ -26,6 +26,7 @@ export const MARBLE_LINEAR_DAMPING = 0.04;
 export const PEG_RESTITUTION = 0.4;
 export const WALL_RESTITUTION = 0.15;
 export const SPINNER_RESTITUTION = 0.4;
+export const BUMPER_RESTITUTION = 0.9;
 export const OBSTACLE_FRICTION = 0.1;
 /** Hard safety cap so a stuck marble can never hang the sim (90s @ 60fps). */
 export const DEFAULT_MAX_FRAMES = 60 * 90;
@@ -110,6 +111,23 @@ export class Race {
       const desc = RAPIER.ColliderDesc.ball(peg.radius)
         .setTranslation(peg.x, peg.y)
         .setRestitution(PEG_RESTITUTION)
+        .setFriction(OBSTACLE_FRICTION);
+      this.world.createCollider(desc, staticBody);
+    }
+
+    for (const bumper of this.level.bumpers ?? []) {
+      const desc = RAPIER.ColliderDesc.ball(bumper.radius)
+        .setTranslation(bumper.x, bumper.y)
+        .setRestitution(BUMPER_RESTITUTION)
+        .setFriction(0);
+      this.world.createCollider(desc, staticBody);
+    }
+
+    for (const box of this.level.boxes ?? []) {
+      const desc = RAPIER.ColliderDesc.cuboid(box.width / 2, box.height / 2)
+        .setTranslation(box.x, box.y)
+        .setRotation(box.angle)
+        .setRestitution(WALL_RESTITUTION)
         .setFriction(OBSTACLE_FRICTION);
       this.world.createCollider(desc, staticBody);
     }
