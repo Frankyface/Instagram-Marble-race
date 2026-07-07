@@ -146,6 +146,24 @@ body {
   width: 130px;
 }
 
+.ball-count select {
+  background: #212633;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.9rem;
+}
+
+.champion-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #ffffff55;
+  display: inline-block;
+  box-shadow: 0 0 12px currentColor;
+}
+
 .race-status {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
